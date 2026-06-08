@@ -1154,6 +1154,14 @@ select.sheet-input { appearance: none; }
 <div class="bottom-sheet" id="importSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-title">&#128229; Import Daily Data</div>
+  <div style="margin-bottom:12px">
+    <label class="sheet-btn secondary" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:0;cursor:pointer">
+      &#128206; Choose JSON File
+      <input type="file" id="importFileInput" accept=".json,application/json" style="display:none" onchange="handleImportFile(this)">
+    </label>
+    <div id="importFileName" style="font-size:12px;color:#8E8BA3;text-align:center;margin-top:6px"></div>
+  </div>
+  <div style="text-align:center;font-size:12px;color:#B8B5C8;margin-bottom:8px">or paste JSON below</div>
   <textarea class="import-textarea" id="importTextarea" placeholder="Paste your JSON here..."></textarea>
   <div class="import-status" id="importStatus"></div>
   <button class="sheet-btn" onclick="importData()">Import & Merge</button>
@@ -1832,10 +1840,23 @@ function renderMoney() {
 /* ============================================
    IMPORT / EXPORT
    ============================================ */
+function handleImportFile(input) {
+  var file = input.files[0];
+  if (!file) return;
+  document.getElementById('importFileName').textContent = file.name;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('importTextarea').value = e.target.result;
+  };
+  reader.readAsText(file);
+}
+
 function openImportSheet() {
   document.getElementById('importOverlay').classList.add('visible');
   document.getElementById('importSheet').classList.add('visible');
   document.getElementById('importTextarea').value = '';
+  document.getElementById('importFileInput').value = '';
+  document.getElementById('importFileName').textContent = '';
   document.getElementById('importStatus').className = 'import-status';
   document.getElementById('importStatus').textContent = '';
 }
