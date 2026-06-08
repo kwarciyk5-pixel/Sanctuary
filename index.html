@@ -1864,12 +1864,37 @@ function importData() {
     return;
   }
 
+  // Support batch import (array of days)
+  if (Array.isArray(data)) {
+    let totalAdded = 0;
+    let datesImported = [];
+    data.forEach(function(dayData) {
+      if (dayData.date) {
+        const result = importSingleDay(dayData);
+        totalAdded += result;
+        datesImported.push(dayData.date);
+      }
+    });
+    saveData();
+    renderHome(); renderStats(); renderTasks(); renderHealth(); renderMoney();
+    statusEl.className = 'import-status success';
+    statusEl.textContent = 'Batch imported ' + datesImported.length + ' days (' + datesImported[0] + ' to ' + datesImported[datesImported.length - 1] + '). ' + totalAdded + ' new entries added.';
+    return;
+  }
+
   if (!data.date) {
     statusEl.className = 'import-status error';
     statusEl.textContent = 'Missing "date" field in JSON.';
     return;
   }
 
+  const addedCount = importSingleDay(data);
+  statusEl.className = 'import-status success';
+  statusEl.textContent = 'Imported data for ' + data.date + '. Added ' + addedCount + ' new timeline entries.';
+  return;
+}
+
+function importSingleDay(data) {
   const dateKey = data.date;
   if (!appData.days[dateKey]) {
     appData.days[dateKey] = {};
@@ -1965,8 +1990,7 @@ function importData() {
   renderHealth();
   renderMoney();
 
-  statusEl.className = 'import-status success';
-  statusEl.textContent = 'Imported data for ' + dateKey + '. Added ' + addedCount + ' new timeline entries.';
+  return addedCount;
 }
 
 function exportData() {
