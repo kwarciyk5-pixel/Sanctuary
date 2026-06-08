@@ -1,6 +1,7 @@
-const CACHE_NAME = 'sanctuary-v1';
+const CACHE_NAME = 'sanctuary-v2';
 const URLS_TO_CACHE = [
-  './sanctuary.html',
+  './',
+  './index.html',
   './manifest.json'
 ];
 
