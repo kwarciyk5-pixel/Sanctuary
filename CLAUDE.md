@@ -76,6 +76,7 @@ Must print `PARSE OK`. For runtime testing, user opens the live site or local fi
 ## Recent work
 
 - **2026-06-08:** Added batch import support. `importData()` now accepts a JSON array of day objects in addition to single-day objects. Split out `importSingleDay(data)` helper that returns added-entry count. Single-day status message stays in `importData` (the helper doesn't touch `statusEl`, which only exists in `importData`'s scope). Old single-day imports unchanged.
+- **2026-06-08:** Set up direct terminal-to-GitHub auth via PAT in macOS Keychain. Claude can now `git push` without prompting.
 
 ## Style for talking to the user
 
