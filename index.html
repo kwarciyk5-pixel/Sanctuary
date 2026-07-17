@@ -1923,24 +1923,36 @@ function importSingleDay(data) {
   const day = appData.days[dateKey];
   let addedCount = 0;
 
-  // Merge entries (dedup by time + text)
+  // Merge entries -- upsert by id; fallback to time+text (enriches in place, never duplicates)
   if (data.entries) {
     if (!day.entries) day.entries = [];
     data.entries.forEach(entry => {
-      const exists = day.entries.some(e => e.time === entry.time && e.text === entry.text);
-      if (!exists) {
+      let existing = null;
+      if (entry.id) existing = day.entries.find(e => e.id === entry.id);
+      if (!existing) existing = day.entries.find(e => e.time === entry.time && e.text === entry.text);
+      if (existing) {
+        Object.assign(existing, entry);
+        if (!existing.id) existing.id = genId();
+      } else {
+        if (!entry.id) entry.id = genId();
         day.entries.push(entry);
         addedCount++;
       }
     });
   }
 
-  // Merge meals
+  // Merge meals -- upsert by id; fallback to time+description
   if (data.meals) {
     if (!day.meals) day.meals = [];
     data.meals.forEach(meal => {
-      const exists = day.meals.some(m => m.time === meal.time && m.description === meal.description);
-      if (!exists) {
+      let existing = null;
+      if (meal.id) existing = day.meals.find(m => m.id === meal.id);
+      if (!existing) existing = day.meals.find(m => m.time === meal.time && m.description === meal.description);
+      if (existing) {
+        Object.assign(existing, meal);
+        if (!existing.id) existing.id = genId();
+      } else {
+        if (!meal.id) meal.id = genId();
         day.meals.push(meal);
       }
     });
@@ -1977,30 +1989,49 @@ function importSingleDay(data) {
     });
   }
 
+  // tasks_added -- dedup by text so re-import does not duplicate tasks
   if (data.tasks_added) {
     data.tasks_added.forEach(t => {
-      addTask(t, 'home', 'none', null);
+      const already = (appData.tasks || []).some(tk => tk.text === t);
+      if (!already) addTask(t, 'home', 'none', null);
     });
   }
 
+  // Merge expenses -- upsert by id; fallback to description+amount
   if (data.expenses) {
     if (!day.expenses) day.expenses = [];
     data.expenses.forEach(exp => {
-      const exists = day.expenses.some(e => e.description === exp.description && e.amount === exp.amount);
-      if (!exists) day.expenses.push(exp);
+      let existing = null;
+      if (exp.id) existing = day.expenses.find(e => e.id === exp.id);
+      if (!existing) existing = day.expenses.find(e => e.description === exp.description && e.amount === exp.amount);
+      if (existing) {
+        Object.assign(existing, exp);
+        if (!existing.id) existing.id = genId();
+      } else {
+        if (!exp.id) exp.id = genId();
+        day.expenses.push(exp);
+      }
     });
   }
 
+  // health_notes -- dedup by id, else by description+date, so re-import does not duplicate
   if (data.health_notes) {
     data.health_notes.forEach(note => {
-      appData.healthEntries.push({
-        description: note.description,
-        suspected_cause: note.related_to || null,
-        date_noticed: dateKey,
-        status: 'active',
-        category: null,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 5)
-      });
+      let existing = null;
+      if (note.id) existing = appData.healthEntries.find(h => h.id === note.id);
+      if (!existing) existing = appData.healthEntries.find(h => h.description === note.description && h.date_noticed === dateKey);
+      if (existing) {
+        if (note.related_to) existing.suspected_cause = note.related_to;
+      } else {
+        appData.healthEntries.push({
+          description: note.description,
+          suspected_cause: note.related_to || null,
+          date_noticed: dateKey,
+          status: 'active',
+          category: null,
+          id: note.id || genId()
+        });
+      }
     });
   }
 
@@ -2140,6 +2171,10 @@ function submitNewHealth() {
 /* ============================================
    UTILITIES
    ============================================ */
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
