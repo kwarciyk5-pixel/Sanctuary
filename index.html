@@ -850,6 +850,53 @@ select.sheet-input { appearance: none; }
 .habits-grid-cell.partial { background: rgba(181,234,205,0.4); }
 
 /* ============================================
+   QUICK ADD (Paste B)
+   ============================================ */
+.quick-add-bar { display: flex; gap: 10px; margin-bottom: 16px; }
+.qa-log-btn {
+  flex: 1; padding: 14px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--lavender), var(--lavender-deep));
+  color: white; font-size: 14px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease;
+}
+.qa-log-btn:active { transform: scale(0.97); }
+.qa-water-btn {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--sky-deep); font-size: 14px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease;
+}
+.qa-water-btn:active { transform: scale(0.94); }
+.qa-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scrollbar-width: none; }
+.qa-chips::-webkit-scrollbar { display: none; }
+.qa-chip {
+  white-space: nowrap; padding: 8px 14px;
+  border-radius: var(--radius-full);
+  font-size: 13px; font-weight: 600;
+  background: var(--bg); color: var(--text-secondary);
+  border: 1.5px solid rgba(45,43,61,0.08);
+  transition: all 0.2s ease;
+}
+.qa-chip.active {
+  background: linear-gradient(135deg, var(--lavender), var(--lavender-deep));
+  color: white; border-color: transparent;
+}
+.qa-expand {
+  font-size: 13px; font-weight: 700; color: var(--lavender-deep);
+  padding: 8px 0; cursor: pointer; user-select: none;
+}
+.qa-section-label {
+  font-size: 12px; font-weight: 700; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin: 14px 0 8px;
+}
+.stat-card.under-target { opacity: 0.65; }
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 @media (min-width: 768px) {
@@ -907,6 +954,11 @@ select.sheet-input { appearance: none; }
       <div class="date-header">
         <div class="date-header-day" id="homeDayName"></div>
         <div class="date-header-date" id="homeDateStr"></div>
+      </div>
+
+      <div class="quick-add-bar">
+        <button class="qa-log-btn" onclick="openQuickAdd()">&#10133; Log something</button>
+        <button class="qa-water-btn" onclick="addWater(250)">&#128167; +250ml</button>
       </div>
 
       <div class="stat-grid">
@@ -982,6 +1034,22 @@ select.sheet-input { appearance: none; }
             <div class="stat-module-value" id="statsCalAvg">-- avg</div>
           </div>
           <div class="mini-bar-chart" id="statsCalBars"></div>
+        </div>
+
+        <div class="stat-module">
+          <div class="stat-module-header">
+            <div class="stat-module-title">&#127831; Protein</div>
+            <div class="stat-module-value" id="statsProteinAvg">-- avg</div>
+          </div>
+          <div class="mini-bar-chart" id="statsProteinBars"></div>
+        </div>
+
+        <div class="stat-module">
+          <div class="stat-module-header">
+            <div class="stat-module-title">&#129482; Sodium</div>
+            <div class="stat-module-value" id="statsSodiumAvg">-- avg</div>
+          </div>
+          <div class="mini-bar-chart" id="statsSodiumBars"></div>
         </div>
 
         <div class="stat-module">
@@ -1178,6 +1246,29 @@ select.sheet-input { appearance: none; }
   </div>
 </div>
 
+<!-- ===================== QUICK ADD SHEET ===================== -->
+<div class="sheet-overlay" id="quickAddOverlay" onclick="closeQuickAdd()"></div>
+<div class="bottom-sheet" id="quickAddSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">&#10133; Quick Log</div>
+  <div class="qa-chips">
+    <button class="qa-chip active" data-type="meal" onclick="selectQuickType('meal', this)">&#127860; Meal</button>
+    <button class="qa-chip" data-type="water" onclick="selectQuickType('water', this)">&#128167; Water</button>
+    <button class="qa-chip" data-type="health" onclick="selectQuickType('health', this)">&#129657; Health</button>
+    <button class="qa-chip" data-type="money" onclick="selectQuickType('money', this)">&#128176; Money</button>
+    <button class="qa-chip" data-type="misc" onclick="selectQuickType('misc', this)">&#9728;&#65039; Misc</button>
+  </div>
+  <div id="quickAddFields"></div>
+</div>
+
+<!-- ===================== ENTRY DETAIL SHEET ===================== -->
+<div class="sheet-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="bottom-sheet" id="detailSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Entry Detail</div>
+  <div id="detailFields"></div>
+</div>
+
 <!-- ===================== JAVASCRIPT ===================== -->
 <script>
 /* ============================================
@@ -1335,7 +1426,12 @@ function renderHome() {
   const water = dayData.water_ml || 0;
   const waterEl = document.getElementById('homeWater');
   waterEl.textContent = water > 0 ? water : '--';
-  document.getElementById('homeWaterSub').textContent = 'of 1200ml';
+  document.getElementById('homeWaterSub').textContent = water > 0 ? ('of ' + WATER_TARGET + 'ml') : 'no data';
+  const waterCard = waterEl.closest('.stat-card');
+  if (waterCard) {
+    if (water > 0 && water < WATER_TARGET) waterCard.classList.add('under-target');
+    else waterCard.classList.remove('under-target');
+  }
 
   // Calories
   let totalCal = 0;
@@ -1430,7 +1526,8 @@ function renderTimeline(dayData) {
 
   sorted.forEach(entry => {
     const cat = entry.category || 'other';
-    html += '<div class="timeline-entry">';
+    const clickAttr = entry.id ? ' onclick="openEntryDetail(\'' + selectedDate + '\',\'' + entry.id + '\')" style="cursor:pointer"' : '';
+    html += '<div class="timeline-entry"' + clickAttr + '>';
     html += '<div class="timeline-dot ' + cat + '"></div>';
     if (entry.time) html += '<div class="timeline-time">' + entry.time + '</div>';
     html += '<div class="timeline-text">' + escapeHtml(entry.text || '') + '</div>';
@@ -1487,7 +1584,7 @@ function renderStats(period) {
   // Water bars
   renderMiniBars('statsWaterBars', dates, function(d) {
     return (appData.days[d] && appData.days[d].water_ml) || 0;
-  }, 2000, 'var(--sky)', 'statsWaterAvg', 'ml avg');
+  }, WATER_TARGET, 'var(--sky)', 'statsWaterAvg', 'ml avg');
 
   // Sleep bars (convert to hours)
   renderMiniBars('statsSleepBars', dates, function(d) {
@@ -1503,6 +1600,22 @@ function renderStats(period) {
     let t = 0; day.meals.forEach(m => t += m.calories || 0);
     return t;
   }, 2000, 'var(--peach)', 'statsCalAvg', 'avg');
+
+  // Protein bars
+  renderMiniBars('statsProteinBars', dates, function(d) {
+    const day = appData.days[d];
+    if (!day || !day.meals) return 0;
+    let t = 0; day.meals.forEach(m => t += m.protein_g || 0);
+    return t;
+  }, 115, 'var(--mint)', 'statsProteinAvg', 'g avg');
+
+  // Sodium bars
+  renderMiniBars('statsSodiumBars', dates, function(d) {
+    const day = appData.days[d];
+    if (!day || !day.meals) return 0;
+    let t = 0; day.meals.forEach(m => t += m.sodium_mg || 0);
+    return t;
+  }, 2300, 'var(--peach)', 'statsSodiumAvg', 'mg avg');
 
   // Medicine bars
   renderMiniBars('statsMedBars', dates, function(d) {
@@ -2171,6 +2284,252 @@ function submitNewHealth() {
 /* ============================================
    UTILITIES
    ============================================ */
+/* ===== QUICK ADD + DETAIL (Paste B) ===== */
+const WATER_TARGET = 1200;
+let quickAddType = 'meal';
+let quickNutritionOpen = false;
+let detailContext = null;
+
+function nowTime() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function numOrNull(id) {
+  const el = document.getElementById(id);
+  if (!el || el.value === '') return null;
+  const n = parseFloat(el.value);
+  return isNaN(n) ? null : n;
+}
+function valOrEmpty(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+function ensureDay(dateKey) {
+  if (!appData.days[dateKey]) appData.days[dateKey] = {};
+  return appData.days[dateKey];
+}
+function escapeAttr(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function openQuickAdd() {
+  quickAddType = 'meal';
+  quickNutritionOpen = false;
+  document.getElementById('quickAddOverlay').classList.add('visible');
+  document.getElementById('quickAddSheet').classList.add('visible');
+  document.querySelectorAll('.qa-chip').forEach(c => c.classList.remove('active'));
+  const firstChip = document.querySelector('.qa-chip[data-type="meal"]');
+  if (firstChip) firstChip.classList.add('active');
+  renderQuickFields('meal');
+}
+function closeQuickAdd() {
+  document.getElementById('quickAddOverlay').classList.remove('visible');
+  document.getElementById('quickAddSheet').classList.remove('visible');
+}
+function selectQuickType(type, btn) {
+  quickAddType = type;
+  quickNutritionOpen = false;
+  document.querySelectorAll('.qa-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderQuickFields(type);
+}
+function toggleNutrition() {
+  quickNutritionOpen = !quickNutritionOpen;
+  document.getElementById('qaNutrition').style.display = quickNutritionOpen ? 'block' : 'none';
+  document.getElementById('qaNutritionToggle').textContent = quickNutritionOpen ? '- hide nutrition' : '+ add nutrition';
+}
+
+function renderQuickFields(type) {
+  const c = document.getElementById('quickAddFields');
+  const t = nowTime();
+  const today = todayStr();
+  const dateRow = '<div class="sheet-field"><label class="sheet-label">Date</label><input class="sheet-input" id="qaDate" type="date" value="' + today + '"></div>';
+  const timeRow = '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="qaTime" type="time" value="' + t + '"></div>';
+  const noteRow = '<div class="sheet-field"><label class="sheet-label">Note (optional)</label><input class="sheet-input" id="qaNote" placeholder="anything to remember"></div>';
+
+  if (type === 'meal') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">Meal</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Pad kaprao muu + rice"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Meal type</label><select class="sheet-input" id="qaMealType"><option value="breakfast">Breakfast</option><option value="lunch" selected>Lunch</option><option value="dinner">Dinner</option><option value="supper">Supper</option><option value="snack">Snack</option></select></div>' +
+      timeRow + dateRow + noteRow +
+      '<div id="qaNutritionToggle" class="qa-expand" onclick="toggleNutrition()">+ add nutrition</div>' +
+      '<div id="qaNutrition" style="display:none">' +
+      '<div class="sheet-field"><label class="sheet-label">Calories</label><input class="sheet-input" id="qaCal" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Protein (g)</label><input class="sheet-input" id="qaProtein" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Carb (g)</label><input class="sheet-input" id="qaCarb" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Fat (g)</label><input class="sheet-input" id="qaFat" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Fiber (g)</label><input class="sheet-input" id="qaFiber" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Sodium (mg)</label><input class="sheet-input" id="qaSodium" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Source</label><select class="sheet-input" id="qaSource"><option value="home">Home</option><option value="market">Market</option><option value="restaurant">Restaurant</option><option value="convenience">Convenience store</option></select></div>' +
+      '</div>' +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Meal</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else if (type === 'water') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">Amount (ml)</label><input class="sheet-input" id="qaWater" type="number" inputmode="numeric" value="250"></div>' +
+      timeRow + dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Water</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else if (type === 'health') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">What did you notice?</label><input class="sheet-input" id="qaHealthDesc" placeholder="e.g. Perioral tightness"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Suspected cause</label><input class="sheet-input" id="qaHealthCause" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Body area</label><select class="sheet-input" id="qaHealthCat"><option value="skin">Skin</option><option value="eyes">Eyes</option><option value="digestive">Digestive</option><option value="hormonal">Hormonal</option><option value="pain">Pain</option><option value="other">Other</option></select></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Status</label><select class="sheet-input" id="qaHealthStatus"><option value="active">Active</option><option value="monitoring">Monitoring</option><option value="resolved">Resolved</option></select></div>' +
+      dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Health Note</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else if (type === 'money') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">Description</label><input class="sheet-input" id="qaMoneyDesc" placeholder="e.g. 7-Eleven snacks"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Amount (THB)</label><input class="sheet-input" id="qaMoneyAmt" type="number" inputmode="numeric" placeholder="0"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Category</label><select class="sheet-input" id="qaMoneyCat"><option value="food">Food</option><option value="transport">Transport</option><option value="health">Health</option><option value="shopping">Shopping</option><option value="entertainment">Entertainment</option><option value="other">Other</option></select></div>' +
+      dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Expense</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">What happened?</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Showered, called a friend"></div>' +
+      timeRow + dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  }
+}
+
+function submitQuickAdd() {
+  const type = quickAddType;
+  if (type === 'water') {
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const amt = numOrNull('qaWater') || 0;
+    if (amt <= 0) return;
+    const day = ensureDay(dateKey);
+    day.water_ml = (day.water_ml || 0) + amt;
+    if (!day.entries) day.entries = [];
+    day.entries.push({ id: genId(), time: valOrEmpty('qaTime') || nowTime(), text: '+' + amt + 'ml water', category: 'other', tags: ['water'], note: valOrEmpty('qaNote') || null });
+    saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
+    return;
+  }
+  if (type === 'health') {
+    const desc = valOrEmpty('qaHealthDesc');
+    if (!desc) return;
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    appData.healthEntries.push({ description: desc, suspected_cause: valOrEmpty('qaHealthCause') || null, category: valOrEmpty('qaHealthCat'), status: valOrEmpty('qaHealthStatus'), date_noticed: dateKey, note: valOrEmpty('qaNote') || null, id: genId() });
+    saveData(); renderHealth(); closeQuickAdd();
+    return;
+  }
+  if (type === 'money') {
+    const desc = valOrEmpty('qaMoneyDesc');
+    const amt = numOrNull('qaMoneyAmt');
+    if (!desc || amt === null) return;
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const day = ensureDay(dateKey);
+    if (!day.expenses) day.expenses = [];
+    day.expenses.push({ id: genId(), description: desc, amount: amt, category: valOrEmpty('qaMoneyCat'), note: valOrEmpty('qaNote') || null });
+    saveData(); renderMoney(); closeQuickAdd();
+    return;
+  }
+  if (type === 'meal') {
+    const desc = valOrEmpty('qaDesc');
+    if (!desc) return;
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const time = valOrEmpty('qaTime') || nowTime();
+    const note = valOrEmpty('qaNote') || null;
+    const day = ensureDay(dateKey);
+    const sharedId = genId();
+    const cal = numOrNull('qaCal');
+    if (!day.entries) day.entries = [];
+    day.entries.push({ id: sharedId, time: time, text: desc, category: 'meal', tags: [], note: note, calories: cal });
+    if (!day.meals) day.meals = [];
+    day.meals.push({ id: sharedId, time: time, description: desc, meal_type: valOrEmpty('qaMealType'), calories: cal, protein_g: numOrNull('qaProtein'), carb_g: numOrNull('qaCarb'), fat_g: numOrNull('qaFat'), fiber_g: numOrNull('qaFiber'), sodium_mg: numOrNull('qaSodium'), source: valOrEmpty('qaSource'), note: note });
+    saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
+    return;
+  }
+  const desc = valOrEmpty('qaDesc');
+  if (!desc) return;
+  const dateKey = valOrEmpty('qaDate') || todayStr();
+  const day = ensureDay(dateKey);
+  if (!day.entries) day.entries = [];
+  day.entries.push({ id: genId(), time: valOrEmpty('qaTime') || nowTime(), text: desc, category: 'other', tags: [], note: valOrEmpty('qaNote') || null });
+  saveData(); selectedDate = dateKey; renderHome(); closeQuickAdd();
+}
+
+function addWater(ml) {
+  const dateKey = todayStr();
+  const day = ensureDay(dateKey);
+  day.water_ml = (day.water_ml || 0) + ml;
+  if (!day.entries) day.entries = [];
+  day.entries.push({ id: genId(), time: nowTime(), text: '+' + ml + 'ml water', category: 'other', tags: ['water'], note: null });
+  saveData(); selectedDate = dateKey; renderHome(); renderStats();
+}
+
+function openEntryDetail(dateKey, id) {
+  const day = appData.days[dateKey];
+  if (!day || !day.entries) return;
+  const entry = day.entries.find(e => e.id === id);
+  if (!entry) return;
+  detailContext = { dateKey: dateKey, id: id };
+  const meal = (day.meals || []).find(m => m.id === id);
+  const c = document.getElementById('detailFields');
+  let html =
+    '<div class="sheet-field"><label class="sheet-label">Text</label><input class="sheet-input" id="dtText" value="' + escapeAttr(entry.text || '') + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="dtTime" type="time" value="' + (entry.time || '') + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
+  if (meal) {
+    html +=
+      '<div class="qa-section-label">Nutrition</div>' +
+      '<div class="sheet-field"><label class="sheet-label">Calories</label><input class="sheet-input" id="dtCal" type="number" value="' + (meal.calories != null ? meal.calories : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Protein (g)</label><input class="sheet-input" id="dtProtein" type="number" value="' + (meal.protein_g != null ? meal.protein_g : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Carb (g)</label><input class="sheet-input" id="dtCarb" type="number" value="' + (meal.carb_g != null ? meal.carb_g : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Fat (g)</label><input class="sheet-input" id="dtFat" type="number" value="' + (meal.fat_g != null ? meal.fat_g : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Fiber (g)</label><input class="sheet-input" id="dtFiber" type="number" value="' + (meal.fiber_g != null ? meal.fiber_g : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Sodium (mg)</label><input class="sheet-input" id="dtSodium" type="number" value="' + (meal.sodium_mg != null ? meal.sodium_mg : '') + '"></div>';
+  }
+  html +=
+    '<button class="sheet-btn" onclick="saveEntryDetail()">Save</button>' +
+    '<button class="sheet-btn secondary" onclick="deleteEntryDetail()">Delete entry</button>' +
+    '<button class="sheet-btn secondary" onclick="closeDetail()">Cancel</button>';
+  c.innerHTML = html;
+  document.getElementById('detailOverlay').classList.add('visible');
+  document.getElementById('detailSheet').classList.add('visible');
+}
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('visible');
+  document.getElementById('detailSheet').classList.remove('visible');
+  detailContext = null;
+}
+function saveEntryDetail() {
+  if (!detailContext) return;
+  const day = appData.days[detailContext.dateKey];
+  if (!day) return;
+  const entry = (day.entries || []).find(e => e.id === detailContext.id);
+  if (!entry) return;
+  entry.text = valOrEmpty('dtText');
+  entry.time = valOrEmpty('dtTime');
+  entry.note = valOrEmpty('dtNote') || null;
+  const meal = (day.meals || []).find(m => m.id === detailContext.id);
+  if (meal) {
+    meal.description = entry.text;
+    meal.time = entry.time;
+    meal.note = entry.note;
+    meal.calories = numOrNull('dtCal');
+    meal.protein_g = numOrNull('dtProtein');
+    meal.carb_g = numOrNull('dtCarb');
+    meal.fat_g = numOrNull('dtFat');
+    meal.fiber_g = numOrNull('dtFiber');
+    meal.sodium_mg = numOrNull('dtSodium');
+    entry.calories = meal.calories;
+  }
+  saveData(); renderHome(); renderStats(); closeDetail();
+}
+function deleteEntryDetail() {
+  if (!detailContext) return;
+  const day = appData.days[detailContext.dateKey];
+  if (!day) return;
+  if (day.entries) day.entries = day.entries.filter(e => e.id !== detailContext.id);
+  if (day.meals) day.meals = day.meals.filter(m => m.id !== detailContext.id);
+  saveData(); renderHome(); renderStats(); closeDetail();
+}
+
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
 }
