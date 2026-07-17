@@ -850,6 +850,93 @@ select.sheet-input { appearance: none; }
 .habits-grid-cell.partial { background: rgba(181,234,205,0.4); }
 
 /* ============================================
+   QUICK ADD (Paste B)
+   ============================================ */
+.quick-add-bar { display: flex; gap: 10px; margin-bottom: 16px; }
+.qa-log-btn {
+  flex: 1; padding: 14px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--lavender), var(--lavender-deep));
+  color: white; font-size: 14px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease;
+}
+.qa-log-btn:active { transform: scale(0.97); }
+.qa-water-btn {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  color: var(--sky-deep); font-size: 14px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease;
+}
+.qa-water-btn:active { transform: scale(0.94); }
+.qa-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scrollbar-width: none; }
+.qa-chips::-webkit-scrollbar { display: none; }
+.qa-chip {
+  white-space: nowrap; padding: 8px 14px;
+  border-radius: var(--radius-full);
+  font-size: 13px; font-weight: 600;
+  background: var(--bg); color: var(--text-secondary);
+  border: 1.5px solid rgba(45,43,61,0.08);
+  transition: all 0.2s ease;
+}
+.qa-chip.active {
+  background: linear-gradient(135deg, var(--lavender), var(--lavender-deep));
+  color: white; border-color: transparent;
+}
+.qa-expand {
+  font-size: 13px; font-weight: 700; color: var(--lavender-deep);
+  padding: 8px 0; cursor: pointer; user-select: none;
+}
+.qa-section-label {
+  font-size: 12px; font-weight: 700; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.5px;
+  margin: 14px 0 8px;
+}
+.stat-card.under-target { opacity: 0.65; }
+
+/* ===== GYM (Paste C) ===== */
+.gym-today-btn {
+  width: 100%; padding: 14px; margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--mint), var(--sky));
+  color: white; font-size: 14px; font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease;
+}
+.gym-today-btn:active { transform: scale(0.98); }
+.gym-sheet { max-height: 88vh; overflow-y: auto; }
+.gym-head { font-size: 15px; font-weight: 700; color: var(--lavender-deep); margin-bottom: 12px; }
+.gym-rest-note { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.gym-rest-timer {
+  position: sticky; top: 0; z-index: 3;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-card); padding: 8px 10px; border-radius: var(--radius-md);
+  margin-bottom: 12px; box-shadow: var(--shadow-sm);
+}
+#gymRestLabel { font-weight: 700; font-size: 15px; min-width: 46px; }
+.gym-rest-timer.active #gymRestLabel { color: var(--sky-deep); }
+.gym-rest-timer button {
+  padding: 6px 10px; border-radius: var(--radius-full);
+  background: var(--bg); font-size: 12px; font-weight: 600; color: var(--text-secondary);
+}
+.gym-ex { background: var(--bg-card); border-radius: var(--radius-md); padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow-sm); }
+.gym-ex-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.gym-ex-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
+.gym-swap { font-size: 13px; font-weight: 700; color: var(--lavender-deep); background: var(--bg); padding: 6px 10px; border-radius: var(--radius-full); }
+.gym-customname { font-size: 13px; font-weight: 600; padding: 6px 10px; border-radius: var(--radius-full); border: 1.5px solid rgba(45,43,61,0.1); max-width: 60%; }
+.gym-ex-body { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.gym-weight { display: flex; flex-direction: column; }
+.gym-weight label { font-size: 10px; color: var(--text-secondary); margin-bottom: 2px; }
+.gym-w { width: 64px; padding: 8px; border-radius: 10px; border: 1.5px solid rgba(45,43,61,0.1); font-size: 14px; text-align: center; }
+.gym-reps { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.gym-rep { width: 44px; padding: 8px 4px; border-radius: 10px; border: 1.5px solid rgba(45,43,61,0.1); font-size: 14px; text-align: center; }
+.gym-setbtn { width: 30px; height: 34px; border-radius: 10px; background: var(--bg); font-size: 16px; font-weight: 700; color: var(--text-secondary); }
+.gym-note { width: 100%; margin-top: 8px; padding: 8px; border-radius: 10px; border: 1.5px solid rgba(45,43,61,0.08); font-size: 13px; }
+.gym-addex { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: var(--radius-md); background: var(--bg); font-size: 13px; font-weight: 700; color: var(--lavender-deep); }
+
+/* ============================================
    RESPONSIVE
    ============================================ */
 @media (min-width: 768px) {
@@ -908,6 +995,12 @@ select.sheet-input { appearance: none; }
         <div class="date-header-day" id="homeDayName"></div>
         <div class="date-header-date" id="homeDateStr"></div>
       </div>
+
+      <div class="quick-add-bar">
+        <button class="qa-log-btn" onclick="openQuickAdd()">&#10133; Log something</button>
+        <button class="qa-water-btn" onclick="addWater(250)">&#128167; +250ml</button>
+      </div>
+      <button class="gym-today-btn" onclick="openGym()">&#127947; Today's Session</button>
 
       <div class="stat-grid">
         <div class="stat-card water" onclick="switchTab('stats')">
@@ -982,6 +1075,22 @@ select.sheet-input { appearance: none; }
             <div class="stat-module-value" id="statsCalAvg">-- avg</div>
           </div>
           <div class="mini-bar-chart" id="statsCalBars"></div>
+        </div>
+
+        <div class="stat-module">
+          <div class="stat-module-header">
+            <div class="stat-module-title">&#127831; Protein</div>
+            <div class="stat-module-value" id="statsProteinAvg">-- avg</div>
+          </div>
+          <div class="mini-bar-chart" id="statsProteinBars"></div>
+        </div>
+
+        <div class="stat-module">
+          <div class="stat-module-header">
+            <div class="stat-module-title">&#129482; Sodium</div>
+            <div class="stat-module-value" id="statsSodiumAvg">-- avg</div>
+          </div>
+          <div class="mini-bar-chart" id="statsSodiumBars"></div>
         </div>
 
         <div class="stat-module">
@@ -1178,6 +1287,43 @@ select.sheet-input { appearance: none; }
   </div>
 </div>
 
+<!-- ===================== QUICK ADD SHEET ===================== -->
+<div class="sheet-overlay" id="quickAddOverlay" onclick="closeQuickAdd()"></div>
+<div class="bottom-sheet" id="quickAddSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">&#10133; Quick Log</div>
+  <div class="qa-chips">
+    <button class="qa-chip active" data-type="meal" onclick="selectQuickType('meal', this)">&#127860; Meal</button>
+    <button class="qa-chip" data-type="water" onclick="selectQuickType('water', this)">&#128167; Water</button>
+    <button class="qa-chip" data-type="health" onclick="selectQuickType('health', this)">&#129657; Health</button>
+    <button class="qa-chip" data-type="money" onclick="selectQuickType('money', this)">&#128176; Money</button>
+    <button class="qa-chip" data-type="misc" onclick="selectQuickType('misc', this)">&#9728;&#65039; Misc</button>
+  </div>
+  <div id="quickAddFields"></div>
+</div>
+
+<!-- ===================== GYM SHEET ===================== -->
+<div class="sheet-overlay" id="gymOverlay" onclick="closeGym()"></div>
+<div class="bottom-sheet gym-sheet" id="gymSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">&#127947; Gym Session</div>
+  <div class="gym-rest-timer" id="gymRestTimer">
+    <span id="gymRestLabel">60s</span>
+    <button onclick="gymRestSeconds=45;startRest()">45s</button>
+    <button onclick="gymRestSeconds=60;startRest()">60s</button>
+    <button onclick="stopRest()">stop</button>
+  </div>
+  <div id="gymFields"></div>
+</div>
+
+<!-- ===================== ENTRY DETAIL SHEET ===================== -->
+<div class="sheet-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+<div class="bottom-sheet" id="detailSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Entry Detail</div>
+  <div id="detailFields"></div>
+</div>
+
 <!-- ===================== JAVASCRIPT ===================== -->
 <script>
 /* ============================================
@@ -1335,7 +1481,12 @@ function renderHome() {
   const water = dayData.water_ml || 0;
   const waterEl = document.getElementById('homeWater');
   waterEl.textContent = water > 0 ? water : '--';
-  document.getElementById('homeWaterSub').textContent = water > 0 ? 'of 2000ml' : 'no data';
+  document.getElementById('homeWaterSub').textContent = water > 0 ? ('of ' + WATER_TARGET + 'ml') : 'no data';
+  const waterCard = waterEl.closest('.stat-card');
+  if (waterCard) {
+    if (water > 0 && water < WATER_TARGET) waterCard.classList.add('under-target');
+    else waterCard.classList.remove('under-target');
+  }
 
   // Calories
   let totalCal = 0;
@@ -1430,7 +1581,8 @@ function renderTimeline(dayData) {
 
   sorted.forEach(entry => {
     const cat = entry.category || 'other';
-    html += '<div class="timeline-entry">';
+    const clickAttr = entry.id ? ' onclick="openEntryDetail(\'' + selectedDate + '\',\'' + entry.id + '\')" style="cursor:pointer"' : '';
+    html += '<div class="timeline-entry"' + clickAttr + '>';
     html += '<div class="timeline-dot ' + cat + '"></div>';
     if (entry.time) html += '<div class="timeline-time">' + entry.time + '</div>';
     html += '<div class="timeline-text">' + escapeHtml(entry.text || '') + '</div>';
@@ -1487,7 +1639,7 @@ function renderStats(period) {
   // Water bars
   renderMiniBars('statsWaterBars', dates, function(d) {
     return (appData.days[d] && appData.days[d].water_ml) || 0;
-  }, 2000, 'var(--sky)', 'statsWaterAvg', 'ml avg');
+  }, WATER_TARGET, 'var(--sky)', 'statsWaterAvg', 'ml avg');
 
   // Sleep bars (convert to hours)
   renderMiniBars('statsSleepBars', dates, function(d) {
@@ -1503,6 +1655,22 @@ function renderStats(period) {
     let t = 0; day.meals.forEach(m => t += m.calories || 0);
     return t;
   }, 2000, 'var(--peach)', 'statsCalAvg', 'avg');
+
+  // Protein bars
+  renderMiniBars('statsProteinBars', dates, function(d) {
+    const day = appData.days[d];
+    if (!day || !day.meals) return 0;
+    let t = 0; day.meals.forEach(m => t += m.protein_g || 0);
+    return t;
+  }, 115, 'var(--mint)', 'statsProteinAvg', 'g avg');
+
+  // Sodium bars
+  renderMiniBars('statsSodiumBars', dates, function(d) {
+    const day = appData.days[d];
+    if (!day || !day.meals) return 0;
+    let t = 0; day.meals.forEach(m => t += m.sodium_mg || 0);
+    return t;
+  }, 2300, 'var(--peach)', 'statsSodiumAvg', 'mg avg');
 
   // Medicine bars
   renderMiniBars('statsMedBars', dates, function(d) {
@@ -1923,24 +2091,36 @@ function importSingleDay(data) {
   const day = appData.days[dateKey];
   let addedCount = 0;
 
-  // Merge entries (dedup by time + text)
+  // Merge entries -- upsert by id; fallback to time+text (enriches in place, never duplicates)
   if (data.entries) {
     if (!day.entries) day.entries = [];
     data.entries.forEach(entry => {
-      const exists = day.entries.some(e => e.time === entry.time && e.text === entry.text);
-      if (!exists) {
+      let existing = null;
+      if (entry.id) existing = day.entries.find(e => e.id === entry.id);
+      if (!existing) existing = day.entries.find(e => e.time === entry.time && e.text === entry.text);
+      if (existing) {
+        Object.assign(existing, entry);
+        if (!existing.id) existing.id = genId();
+      } else {
+        if (!entry.id) entry.id = genId();
         day.entries.push(entry);
         addedCount++;
       }
     });
   }
 
-  // Merge meals
+  // Merge meals -- upsert by id; fallback to time+description
   if (data.meals) {
     if (!day.meals) day.meals = [];
     data.meals.forEach(meal => {
-      const exists = day.meals.some(m => m.time === meal.time && m.description === meal.description);
-      if (!exists) {
+      let existing = null;
+      if (meal.id) existing = day.meals.find(m => m.id === meal.id);
+      if (!existing) existing = day.meals.find(m => m.time === meal.time && m.description === meal.description);
+      if (existing) {
+        Object.assign(existing, meal);
+        if (!existing.id) existing.id = genId();
+      } else {
+        if (!meal.id) meal.id = genId();
         day.meals.push(meal);
       }
     });
@@ -1977,30 +2157,49 @@ function importSingleDay(data) {
     });
   }
 
+  // tasks_added -- dedup by text so re-import does not duplicate tasks
   if (data.tasks_added) {
     data.tasks_added.forEach(t => {
-      addTask(t, 'home', 'none', null);
+      const already = (appData.tasks || []).some(tk => tk.text === t);
+      if (!already) addTask(t, 'home', 'none', null);
     });
   }
 
+  // Merge expenses -- upsert by id; fallback to description+amount
   if (data.expenses) {
     if (!day.expenses) day.expenses = [];
     data.expenses.forEach(exp => {
-      const exists = day.expenses.some(e => e.description === exp.description && e.amount === exp.amount);
-      if (!exists) day.expenses.push(exp);
+      let existing = null;
+      if (exp.id) existing = day.expenses.find(e => e.id === exp.id);
+      if (!existing) existing = day.expenses.find(e => e.description === exp.description && e.amount === exp.amount);
+      if (existing) {
+        Object.assign(existing, exp);
+        if (!existing.id) existing.id = genId();
+      } else {
+        if (!exp.id) exp.id = genId();
+        day.expenses.push(exp);
+      }
     });
   }
 
+  // health_notes -- dedup by id, else by description+date, so re-import does not duplicate
   if (data.health_notes) {
     data.health_notes.forEach(note => {
-      appData.healthEntries.push({
-        description: note.description,
-        suspected_cause: note.related_to || null,
-        date_noticed: dateKey,
-        status: 'active',
-        category: null,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 5)
-      });
+      let existing = null;
+      if (note.id) existing = appData.healthEntries.find(h => h.id === note.id);
+      if (!existing) existing = appData.healthEntries.find(h => h.description === note.description && h.date_noticed === dateKey);
+      if (existing) {
+        if (note.related_to) existing.suspected_cause = note.related_to;
+      } else {
+        appData.healthEntries.push({
+          description: note.description,
+          suspected_cause: note.related_to || null,
+          date_noticed: dateKey,
+          status: 'active',
+          category: null,
+          id: note.id || genId()
+        });
+      }
     });
   }
 
@@ -2140,6 +2339,464 @@ function submitNewHealth() {
 /* ============================================
    UTILITIES
    ============================================ */
+/* ===== QUICK ADD + DETAIL (Paste B) ===== */
+const WATER_TARGET = 1200;
+let quickAddType = 'meal';
+let quickNutritionOpen = false;
+let detailContext = null;
+
+function nowTime() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function numOrNull(id) {
+  const el = document.getElementById(id);
+  if (!el || el.value === '') return null;
+  const n = parseFloat(el.value);
+  return isNaN(n) ? null : n;
+}
+function valOrEmpty(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+function ensureDay(dateKey) {
+  if (!appData.days[dateKey]) appData.days[dateKey] = {};
+  return appData.days[dateKey];
+}
+function escapeAttr(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function openQuickAdd() {
+  quickAddType = 'meal';
+  quickNutritionOpen = false;
+  document.getElementById('quickAddOverlay').classList.add('visible');
+  document.getElementById('quickAddSheet').classList.add('visible');
+  document.querySelectorAll('.qa-chip').forEach(c => c.classList.remove('active'));
+  const firstChip = document.querySelector('.qa-chip[data-type="meal"]');
+  if (firstChip) firstChip.classList.add('active');
+  renderQuickFields('meal');
+}
+function closeQuickAdd() {
+  document.getElementById('quickAddOverlay').classList.remove('visible');
+  document.getElementById('quickAddSheet').classList.remove('visible');
+}
+function selectQuickType(type, btn) {
+  quickAddType = type;
+  quickNutritionOpen = false;
+  document.querySelectorAll('.qa-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderQuickFields(type);
+}
+function toggleNutrition() {
+  quickNutritionOpen = !quickNutritionOpen;
+  document.getElementById('qaNutrition').style.display = quickNutritionOpen ? 'block' : 'none';
+  document.getElementById('qaNutritionToggle').textContent = quickNutritionOpen ? '- hide nutrition' : '+ add nutrition';
+}
+
+function renderQuickFields(type) {
+  const c = document.getElementById('quickAddFields');
+  const t = nowTime();
+  const today = todayStr();
+  const dateRow = '<div class="sheet-field"><label class="sheet-label">Date</label><input class="sheet-input" id="qaDate" type="date" value="' + today + '"></div>';
+  const timeRow = '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="qaTime" type="time" value="' + t + '"></div>';
+  const noteRow = '<div class="sheet-field"><label class="sheet-label">Note (optional)</label><input class="sheet-input" id="qaNote" placeholder="anything to remember"></div>';
+
+  if (type === 'meal') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">Meal</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Pad kaprao muu + rice"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Meal type</label><select class="sheet-input" id="qaMealType"><option value="breakfast">Breakfast</option><option value="lunch" selected>Lunch</option><option value="dinner">Dinner</option><option value="supper">Supper</option><option value="snack">Snack</option></select></div>' +
+      timeRow + dateRow + noteRow +
+      '<div id="qaNutritionToggle" class="qa-expand" onclick="toggleNutrition()">+ add nutrition</div>' +
+      '<div id="qaNutrition" style="display:none">' +
+      '<div class="sheet-field"><label class="sheet-label">Calories</label><input class="sheet-input" id="qaCal" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Protein (g)</label><input class="sheet-input" id="qaProtein" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Carb (g)</label><input class="sheet-input" id="qaCarb" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Fat (g)</label><input class="sheet-input" id="qaFat" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Fiber (g)</label><input class="sheet-input" id="qaFiber" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Sodium (mg)</label><input class="sheet-input" id="qaSodium" type="number" inputmode="numeric" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Source</label><select class="sheet-input" id="qaSource"><option value="home">Home</option><option value="market">Market</option><option value="restaurant">Restaurant</option><option value="convenience">Convenience store</option></select></div>' +
+      '</div>' +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Meal</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else if (type === 'water') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">Amount (ml)</label><input class="sheet-input" id="qaWater" type="number" inputmode="numeric" value="250"></div>' +
+      timeRow + dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Water</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else if (type === 'health') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">What did you notice?</label><input class="sheet-input" id="qaHealthDesc" placeholder="e.g. Perioral tightness"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Suspected cause</label><input class="sheet-input" id="qaHealthCause" placeholder="optional"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Body area</label><select class="sheet-input" id="qaHealthCat"><option value="skin">Skin</option><option value="eyes">Eyes</option><option value="digestive">Digestive</option><option value="hormonal">Hormonal</option><option value="pain">Pain</option><option value="other">Other</option></select></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Status</label><select class="sheet-input" id="qaHealthStatus"><option value="active">Active</option><option value="monitoring">Monitoring</option><option value="resolved">Resolved</option></select></div>' +
+      dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Health Note</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else if (type === 'money') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">Description</label><input class="sheet-input" id="qaMoneyDesc" placeholder="e.g. 7-Eleven snacks"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Amount (THB)</label><input class="sheet-input" id="qaMoneyAmt" type="number" inputmode="numeric" placeholder="0"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Category</label><select class="sheet-input" id="qaMoneyCat"><option value="food">Food</option><option value="transport">Transport</option><option value="health">Health</option><option value="shopping">Shopping</option><option value="entertainment">Entertainment</option><option value="other">Other</option></select></div>' +
+      dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Expense</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">What happened?</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Showered, called a friend"></div>' +
+      timeRow + dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  }
+}
+
+function submitQuickAdd() {
+  const type = quickAddType;
+  if (type === 'water') {
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const amt = numOrNull('qaWater') || 0;
+    if (amt <= 0) return;
+    const day = ensureDay(dateKey);
+    day.water_ml = (day.water_ml || 0) + amt;
+    if (!day.entries) day.entries = [];
+    day.entries.push({ id: genId(), time: valOrEmpty('qaTime') || nowTime(), text: '+' + amt + 'ml water', category: 'other', tags: ['water'], note: valOrEmpty('qaNote') || null });
+    saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
+    return;
+  }
+  if (type === 'health') {
+    const desc = valOrEmpty('qaHealthDesc');
+    if (!desc) return;
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    appData.healthEntries.push({ description: desc, suspected_cause: valOrEmpty('qaHealthCause') || null, category: valOrEmpty('qaHealthCat'), status: valOrEmpty('qaHealthStatus'), date_noticed: dateKey, note: valOrEmpty('qaNote') || null, id: genId() });
+    saveData(); renderHealth(); closeQuickAdd();
+    return;
+  }
+  if (type === 'money') {
+    const desc = valOrEmpty('qaMoneyDesc');
+    const amt = numOrNull('qaMoneyAmt');
+    if (!desc || amt === null) return;
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const day = ensureDay(dateKey);
+    if (!day.expenses) day.expenses = [];
+    day.expenses.push({ id: genId(), description: desc, amount: amt, category: valOrEmpty('qaMoneyCat'), note: valOrEmpty('qaNote') || null });
+    saveData(); renderMoney(); closeQuickAdd();
+    return;
+  }
+  if (type === 'meal') {
+    const desc = valOrEmpty('qaDesc');
+    if (!desc) return;
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const time = valOrEmpty('qaTime') || nowTime();
+    const note = valOrEmpty('qaNote') || null;
+    const day = ensureDay(dateKey);
+    const sharedId = genId();
+    const cal = numOrNull('qaCal');
+    if (!day.entries) day.entries = [];
+    day.entries.push({ id: sharedId, time: time, text: desc, category: 'meal', tags: [], note: note, calories: cal });
+    if (!day.meals) day.meals = [];
+    day.meals.push({ id: sharedId, time: time, description: desc, meal_type: valOrEmpty('qaMealType'), calories: cal, protein_g: numOrNull('qaProtein'), carb_g: numOrNull('qaCarb'), fat_g: numOrNull('qaFat'), fiber_g: numOrNull('qaFiber'), sodium_mg: numOrNull('qaSodium'), source: valOrEmpty('qaSource'), note: note });
+    saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
+    return;
+  }
+  const desc = valOrEmpty('qaDesc');
+  if (!desc) return;
+  const dateKey = valOrEmpty('qaDate') || todayStr();
+  const day = ensureDay(dateKey);
+  if (!day.entries) day.entries = [];
+  day.entries.push({ id: genId(), time: valOrEmpty('qaTime') || nowTime(), text: desc, category: 'other', tags: [], note: valOrEmpty('qaNote') || null });
+  saveData(); selectedDate = dateKey; renderHome(); closeQuickAdd();
+}
+
+function addWater(ml) {
+  const dateKey = todayStr();
+  const day = ensureDay(dateKey);
+  day.water_ml = (day.water_ml || 0) + ml;
+  if (!day.entries) day.entries = [];
+  day.entries.push({ id: genId(), time: nowTime(), text: '+' + ml + 'ml water', category: 'other', tags: ['water'], note: null });
+  saveData(); selectedDate = dateKey; renderHome(); renderStats();
+}
+
+function openEntryDetail(dateKey, id) {
+  const day = appData.days[dateKey];
+  if (!day || !day.entries) return;
+  const entry = day.entries.find(e => e.id === id);
+  if (!entry) return;
+  detailContext = { dateKey: dateKey, id: id };
+  const meal = (day.meals || []).find(m => m.id === id);
+  const c = document.getElementById('detailFields');
+  let html =
+    '<div class="sheet-field"><label class="sheet-label">Text</label><input class="sheet-input" id="dtText" value="' + escapeAttr(entry.text || '') + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="dtTime" type="time" value="' + (entry.time || '') + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
+  if (meal) {
+    html +=
+      '<div class="qa-section-label">Nutrition</div>' +
+      '<div class="sheet-field"><label class="sheet-label">Calories</label><input class="sheet-input" id="dtCal" type="number" value="' + (meal.calories != null ? meal.calories : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Protein (g)</label><input class="sheet-input" id="dtProtein" type="number" value="' + (meal.protein_g != null ? meal.protein_g : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Carb (g)</label><input class="sheet-input" id="dtCarb" type="number" value="' + (meal.carb_g != null ? meal.carb_g : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Fat (g)</label><input class="sheet-input" id="dtFat" type="number" value="' + (meal.fat_g != null ? meal.fat_g : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Fiber (g)</label><input class="sheet-input" id="dtFiber" type="number" value="' + (meal.fiber_g != null ? meal.fiber_g : '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Sodium (mg)</label><input class="sheet-input" id="dtSodium" type="number" value="' + (meal.sodium_mg != null ? meal.sodium_mg : '') + '"></div>';
+  }
+  html +=
+    '<button class="sheet-btn" onclick="saveEntryDetail()">Save</button>' +
+    '<button class="sheet-btn secondary" onclick="deleteEntryDetail()">Delete entry</button>' +
+    '<button class="sheet-btn secondary" onclick="closeDetail()">Cancel</button>';
+  c.innerHTML = html;
+  document.getElementById('detailOverlay').classList.add('visible');
+  document.getElementById('detailSheet').classList.add('visible');
+}
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('visible');
+  document.getElementById('detailSheet').classList.remove('visible');
+  detailContext = null;
+}
+function saveEntryDetail() {
+  if (!detailContext) return;
+  const day = appData.days[detailContext.dateKey];
+  if (!day) return;
+  const entry = (day.entries || []).find(e => e.id === detailContext.id);
+  if (!entry) return;
+  entry.text = valOrEmpty('dtText');
+  entry.time = valOrEmpty('dtTime');
+  entry.note = valOrEmpty('dtNote') || null;
+  const meal = (day.meals || []).find(m => m.id === detailContext.id);
+  if (meal) {
+    meal.description = entry.text;
+    meal.time = entry.time;
+    meal.note = entry.note;
+    meal.calories = numOrNull('dtCal');
+    meal.protein_g = numOrNull('dtProtein');
+    meal.carb_g = numOrNull('dtCarb');
+    meal.fat_g = numOrNull('dtFat');
+    meal.fiber_g = numOrNull('dtFiber');
+    meal.sodium_mg = numOrNull('dtSodium');
+    entry.calories = meal.calories;
+  }
+  saveData(); renderHome(); renderStats(); closeDetail();
+}
+function deleteEntryDetail() {
+  if (!detailContext) return;
+  const day = appData.days[detailContext.dateKey];
+  if (!day) return;
+  if (day.entries) day.entries = day.entries.filter(e => e.id !== detailContext.id);
+  if (day.meals) day.meals = day.meals.filter(m => m.id !== detailContext.id);
+  saveData(); renderHome(); renderStats(); closeDetail();
+}
+
+/* ===== GYM LOGGING (Paste C) ===== */
+const GYM_DAY_BY_WEEKDAY = { 1:'Lower A', 2:'Upper A', 4:'Lower B', 5:'Upper B' };
+const GYM_LOADS = {
+  'DB flat bench': 7.5, 'DB one-arm row': 7.5, 'DB incline press': 6,
+  'Lat pulldown': 40, 'DB lateral raise': 2.5
+};
+const GYM_POOLS = {
+  squat: ['Goblet squat','Sumo squat','Front-rack squat','Bulgarian split squat','DB step-up','Wall sit'],
+  hinge: ['RDL','Single-leg RDL','Stiff-leg DL','Conventional DL (DB)','Cable pull-through'],
+  uni_quad: ['Reverse lunge','Walking lunge','Curtsy lunge','Bulgarian split squat','DB step-up'],
+  glute: ['DB hip thrust','Cable glute kickback','Cable hip abduction','Glute bridge','Clamshell'],
+  glute_med: ['Cable hip abduction','Clamshell','Glute bridge'],
+  quad_2nd: ['Goblet squat','Sumo squat','DB step-up','Wall sit'],
+  posterior: ['Single-leg RDL','Cable pull-through','Stiff-leg DL'],
+  h_push: ['DB flat bench','Push-up','Flat fly','Cable crossover','DB pullover'],
+  h_pull: ['Cable seated row','DB one-arm row','Chest-supported row','Bent-over row (DB)'],
+  chest_2nd: ['Incline fly','Cable crossover','DB pullover','DB flat bench','DB incline press'],
+  back_2nd: ['DB one-arm row','Chest-supported row','Cable seated row'],
+  lateral: ['DB lateral raise','Cable lateral raise','Front raise'],
+  arms_a: ['DB curl + pushdown','Cable curl + overhead ext','Incline curl + kickback','Concentration curl + kickback'],
+  v_push: ['DB shoulder press','Machine shoulder press','Arnold press','Push press','Z-press'],
+  v_pull: ['Lat pulldown','Close-grip pulldown','Straight-arm pulldown'],
+  chest: ['DB incline press','Incline fly','DB flat bench','Cable crossover'],
+  rear_delt: ['Rear-delt fly','Face pull'],
+  arms_b: ['Hammer curl + overhead ext','Incline curl + pushdown','Hammer curl + kickback','Cable curl + overhead ext','Hammer curl + pushdown','Incline curl + kickback'],
+  core: ['Cable Pallof','Cable woodchop','Standing cable crunch','Farmer carry','Suitcase carry']
+};
+const GYM_TEMPLATES = {
+  'Lower A': [
+    { job:'squat', label:'Squat', sets:3, reps:10, week:['Goblet squat','Sumo squat','Front-rack squat','Goblet squat','Sumo squat','Front-rack squat'] },
+    { job:'hinge', label:'Hinge', sets:3, reps:10, week:['RDL','Cable pull-through','Single-leg RDL','Stiff-leg DL','RDL','Cable pull-through'] },
+    { job:'uni_quad', label:'Unilateral quad', sets:3, reps:10, week:['Reverse lunge','Bulgarian split squat','DB step-up','Walking lunge','Curtsy lunge','Bulgarian split squat'] },
+    { job:'glute', label:'Glute', sets:3, reps:12, week:['DB hip thrust','Cable glute kickback','DB hip thrust','Cable glute kickback','DB hip thrust','Cable glute kickback'] },
+    { job:'glute_med', label:'Glute-med', sets:3, reps:12, week:['Cable hip abduction','Clamshell','Cable hip abduction','Glute bridge','Cable hip abduction','Clamshell'] },
+    { job:'core', label:'Core', sets:3, reps:12, week:['Cable Pallof','Cable Pallof','Cable Pallof','Cable Pallof','Cable Pallof','Cable Pallof'] }
+  ],
+  'Lower B': [
+    { job:'hinge', label:'Hinge', sets:3, reps:10, week:['RDL','Stiff-leg DL','Conventional DL (DB)','RDL','Stiff-leg DL','Conventional DL (DB)'] },
+    { job:'uni_quad', label:'Unilateral', sets:3, reps:10, week:['Bulgarian split squat','Reverse lunge','Curtsy lunge','Walking lunge','Bulgarian split squat','Reverse lunge'] },
+    { job:'posterior', label:'Posterior', sets:3, reps:10, week:['Single-leg RDL','Cable pull-through','Single-leg RDL','Cable pull-through','Single-leg RDL','Cable pull-through'] },
+    { job:'glute', label:'Glute', sets:3, reps:12, week:['DB hip thrust','Cable glute kickback','DB hip thrust','Cable glute kickback','DB hip thrust','Cable glute kickback'] },
+    { job:'quad_2nd', label:'Quad 2nd', sets:3, reps:10, week:['Goblet squat','DB step-up','Sumo squat','Wall sit','Goblet squat','DB step-up'] },
+    { job:'core', label:'Core', sets:3, reps:12, week:['Cable woodchop','Cable woodchop','Cable woodchop','Cable woodchop','Cable woodchop','Cable woodchop'] }
+  ],
+  'Upper A': [
+    { job:'h_push', label:'Horizontal push', sets:3, reps:10, week:['DB flat bench','Push-up','DB flat bench','Flat fly','DB flat bench','Push-up'] },
+    { job:'h_pull', label:'Horizontal pull', sets:3, reps:10, week:['Cable seated row','DB one-arm row','Chest-supported row','Cable seated row','Bent-over row (DB)','DB one-arm row'] },
+    { job:'chest_2nd', label:'Chest 2nd', sets:3, reps:10, week:['Incline fly','Cable crossover','DB pullover','DB flat bench','Cable crossover','Incline fly'] },
+    { job:'back_2nd', label:'Back 2nd', sets:3, reps:10, week:['DB one-arm row','Chest-supported row','Cable seated row','DB one-arm row','Chest-supported row','Cable seated row'] },
+    { job:'lateral', label:'Lateral raise', sets:3, reps:12, week:['DB lateral raise','Cable lateral raise','DB lateral raise','Cable lateral raise','DB lateral raise','Cable lateral raise'] },
+    { job:'arms_a', label:'Arms SS', sets:3, reps:12, week:['DB curl + pushdown','Cable curl + overhead ext','Incline curl + kickback','DB curl + pushdown','Cable curl + overhead ext','Concentration curl + kickback'] }
+  ],
+  'Upper B': [
+    { job:'v_push', label:'Vertical push', sets:3, reps:10, week:['DB shoulder press','Machine shoulder press','Arnold press','DB shoulder press','Z-press','Machine shoulder press'] },
+    { job:'v_pull', label:'Vertical pull', sets:3, reps:10, week:['Lat pulldown','Close-grip pulldown','Lat pulldown','Straight-arm pulldown','Lat pulldown','Close-grip pulldown'] },
+    { job:'chest', label:'Chest', sets:3, reps:10, week:['DB incline press','Incline fly','DB incline press','Incline fly','DB incline press','Incline fly'] },
+    { job:'h_pull', label:'Horizontal pull', sets:3, reps:10, week:['Cable seated row','DB one-arm row','Chest-supported row','Cable seated row','DB one-arm row','Chest-supported row'] },
+    { job:'rear_delt', label:'Rear delt', sets:3, reps:12, week:['Rear-delt fly','Face pull','Rear-delt fly','Face pull','Rear-delt fly','Face pull'] },
+    { job:'arms_b', label:'Arms SS', sets:3, reps:12, week:['Hammer curl + overhead ext','Incline curl + pushdown','Hammer curl + kickback','Cable curl + overhead ext','Hammer curl + pushdown','Incline curl + kickback'] }
+  ]
+};
+
+let gymSession = null;
+let gymRestSeconds = 60;
+let gymRestInterval = null;
+
+function gymCycleWeek(dateObj) {
+  const anchor = new Date(2026, 6, 20);
+  const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const day = d.getDay();
+  const mondayOffset = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + mondayOffset);
+  const diffWeeks = Math.floor((monday - anchor) / (7*24*3600*1000));
+  return ((diffWeeks % 6) + 6) % 6 + 1;
+}
+function gymDayType(dateObj) { return GYM_DAY_BY_WEEKDAY[dateObj.getDay()] || null; }
+
+function buildGymSession(dateObj, dateKey) {
+  const dayType = gymDayType(dateObj);
+  const wk = gymCycleWeek(dateObj);
+  const session = { date: dateKey, day_type: dayType || 'Freeform', week: wk, exercises: [], finisher: '', notes: '', duration: null };
+  if (dayType && GYM_TEMPLATES[dayType]) {
+    GYM_TEMPLATES[dayType].forEach(slot => {
+      const name = slot.week[wk-1];
+      const reps = [];
+      for (let i=0;i<slot.sets;i++) reps.push(slot.reps);
+      session.exercises.push({ job: slot.job, label: slot.label, name: name, weight: (GYM_LOADS[name] != null ? GYM_LOADS[name] : ''), target_reps: slot.reps, reps: reps, note: '', custom: false });
+    });
+  }
+  return session;
+}
+
+function openGym() {
+  const dateKey = todayStr();
+  const existing = appData.days[dateKey] && appData.days[dateKey].gym;
+  gymSession = existing ? JSON.parse(JSON.stringify(existing)) : buildGymSession(new Date(), dateKey);
+  renderGymSheet();
+  document.getElementById('gymOverlay').classList.add('visible');
+  document.getElementById('gymSheet').classList.add('visible');
+}
+function closeGym() {
+  stopRest();
+  document.getElementById('gymOverlay').classList.remove('visible');
+  document.getElementById('gymSheet').classList.remove('visible');
+  gymSession = null;
+}
+
+function renderGymSheet() {
+  const c = document.getElementById('gymFields');
+  if (!gymSession) { c.innerHTML = ''; return; }
+  let html = '<div class="gym-head">' + escapeHtml(gymSession.day_type) + ' &middot; Week ' + gymSession.week + '</div>';
+  if (!gymSession.exercises.length) {
+    html += '<div class="gym-rest-note">No auto-programmed session today (rest / light day). Add exercises below if you trained.</div>';
+  }
+  gymSession.exercises.forEach((ex, i) => {
+    html += '<div class="gym-ex">';
+    html += '<div class="gym-ex-top"><span class="gym-ex-label">' + escapeHtml(ex.label) + '</span>';
+    if (ex.custom) {
+      html += '<input class="gym-customname" value="' + escapeAttr(ex.name) + '" onchange="gymSetName(' + i + ', this.value)">';
+    } else {
+      html += '<button class="gym-swap" onclick="gymSwap(' + i + ')">' + escapeHtml(ex.name) + ' &#8646;</button>';
+    }
+    html += '</div>';
+    html += '<div class="gym-ex-body">';
+    html += '<div class="gym-weight"><label>kg</label><input class="gym-w" type="number" inputmode="decimal" value="' + (ex.weight !== '' ? ex.weight : '') + '" onchange="gymSetWeight(' + i + ', this.value)"></div>';
+    html += '<div class="gym-reps">';
+    ex.reps.forEach((r, j) => {
+      html += '<input class="gym-rep" type="number" inputmode="numeric" value="' + r + '" onchange="gymSetRep(' + i + ',' + j + ', this.value)">';
+    });
+    html += '<button class="gym-setbtn" onclick="gymAddSet(' + i + ')">+</button>';
+    html += '<button class="gym-setbtn" onclick="gymRemoveSet(' + i + ')">&minus;</button>';
+    html += '</div></div>';
+    html += '<input class="gym-note" placeholder="note (optional)" value="' + escapeAttr(ex.note || '') + '" onchange="gymSetNote(' + i + ', this.value)">';
+    html += '</div>';
+  });
+  html += '<div class="qa-section-label">Session</div>';
+  html += '<div class="sheet-field"><label class="sheet-label">Finisher (optional)</label><input class="sheet-input" value="' + escapeAttr(gymSession.finisher || '') + '" onchange="gymSession.finisher=this.value"></div>';
+  html += '<div class="sheet-field"><label class="sheet-label">Duration (min)</label><input class="sheet-input" id="gymDuration" type="number" value="' + (gymSession.duration != null ? gymSession.duration : '') + '" onchange="gymSession.duration=numOrNull(\'gymDuration\')"></div>';
+  html += '<div class="sheet-field"><label class="sheet-label">Session notes</label><input class="sheet-input" value="' + escapeAttr(gymSession.notes || '') + '" onchange="gymSession.notes=this.value"></div>';
+  html += '<button class="gym-addex" onclick="gymAddExercise()">&#10133; Add exercise</button>';
+  html += '<button class="sheet-btn" onclick="saveGym()">Save Session</button>';
+  html += '<button class="sheet-btn secondary" onclick="closeGym()">Cancel</button>';
+  c.innerHTML = html;
+}
+
+function gymSetWeight(i, v) { gymSession.exercises[i].weight = (v === '' ? '' : parseFloat(v)); }
+function gymSetRep(i, j, v) { gymSession.exercises[i].reps[j] = (v === '' ? 0 : parseInt(v,10)); }
+function gymSetNote(i, v) { gymSession.exercises[i].note = v; }
+function gymSetName(i, v) { gymSession.exercises[i].name = v; }
+function gymAddSet(i) { const ex = gymSession.exercises[i]; ex.reps.push(ex.target_reps || 10); renderGymSheet(); }
+function gymRemoveSet(i) { const ex = gymSession.exercises[i]; if (ex.reps.length > 1) ex.reps.pop(); renderGymSheet(); }
+function gymAddExercise() { gymSession.exercises.push({ job:'core', label:'Extra', name:'', weight:'', target_reps:10, reps:[10,10,10], note:'', custom:true }); renderGymSheet(); }
+function gymSwap(i) {
+  const ex = gymSession.exercises[i];
+  const pool = GYM_POOLS[ex.job] || [];
+  if (!pool.length) return;
+  let idx = pool.indexOf(ex.name);
+  idx = (idx + 1) % pool.length;
+  ex.name = pool[idx];
+  if (GYM_LOADS[ex.name] != null) ex.weight = GYM_LOADS[ex.name];
+  renderGymSheet();
+}
+
+function startRest() {
+  clearInterval(gymRestInterval);
+  let remaining = gymRestSeconds;
+  const timer = document.getElementById('gymRestTimer');
+  const label = document.getElementById('gymRestLabel');
+  timer.classList.add('active');
+  label.textContent = remaining + 's';
+  gymRestInterval = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(gymRestInterval);
+      label.textContent = 'done';
+    } else {
+      label.textContent = remaining + 's';
+    }
+  }, 1000);
+}
+function stopRest() {
+  clearInterval(gymRestInterval);
+  const label = document.getElementById('gymRestLabel');
+  const timer = document.getElementById('gymRestTimer');
+  if (timer) timer.classList.remove('active');
+  if (label) label.textContent = gymRestSeconds + 's';
+}
+
+function saveGym() {
+  const dateKey = gymSession.date || todayStr();
+  const day = ensureDay(dateKey);
+  day.gym = gymSession;
+  const exCount = gymSession.exercises.length;
+  day.exercise = gymSession.day_type + ' - ' + exCount + ' exercises';
+  if (!day.entries) day.entries = [];
+  const entryId = gymSession.entryId || genId();
+  gymSession.entryId = entryId;
+  const entry = { id: entryId, time: nowTime(), text: 'Gym: ' + day.exercise, category: 'other', tags: ['gym'], note: gymSession.notes || null };
+  const existingIdx = day.entries.findIndex(e => e.id === entryId);
+  if (existingIdx !== -1) day.entries[existingIdx] = entry;
+  else day.entries.push(entry);
+  saveData();
+  selectedDate = dateKey;
+  renderHome(); renderStats();
+  closeGym();
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
