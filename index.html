@@ -950,6 +950,10 @@ select.sheet-input { appearance: none; }
 .timeline-dot.gym { background: var(--mint-deep); }
 .timeline-dot.water { background: var(--sky-deep); }
 .task-cat-badge { background: var(--lavender-deep); }
+.gym-hist-row { padding: 10px 0; border-bottom: 1px solid rgba(45,43,61,0.05); cursor: pointer; }
+.gym-hist-row:last-child { border-bottom: none; }
+.gym-hist-name { font-size: 14px; font-weight: 700; }
+.gym-hist-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
 /* ============================================
    RESPONSIVE
@@ -1132,6 +1136,14 @@ select.sheet-input { appearance: none; }
           </div>
           <div class="mini-bar-chart" id="statsHubbyBars"></div>
         </div>
+
+        <div class="stat-module">
+          <div class="stat-module-header">
+            <div class="stat-module-title">&#127947; Exercise History</div>
+            <div class="stat-module-value" id="statsGymCount">--</div>
+          </div>
+          <div id="statsGymList"></div>
+        </div>
       </div>
     </div>
 
@@ -1313,6 +1325,7 @@ select.sheet-input { appearance: none; }
     <button class="qa-chip" data-type="water" onclick="selectQuickType('water', this)">&#128167; Water</button>
     <button class="qa-chip" data-type="health" onclick="selectQuickType('health', this)">&#129657; Health</button>
     <button class="qa-chip" data-type="money" onclick="selectQuickType('money', this)">&#128176; Money</button>
+    <button class="qa-chip" data-type="day" onclick="selectQuickType('day', this)">&#127774; Day</button>
     <button class="qa-chip" data-type="misc" onclick="selectQuickType('misc', this)">&#9728;&#65039; Misc</button>
   </div>
   <div id="quickAddFields"></div>
@@ -1362,6 +1375,14 @@ select.sheet-input { appearance: none; }
   <div class="sheet-handle"></div>
   <div class="sheet-title">Custom range</div>
   <div id="rangeFields"></div>
+</div>
+
+<!-- ===================== GYM HISTORY SHEET ===================== -->
+<div class="sheet-overlay" id="gymHistOverlay" onclick="closeGymHistory()"></div>
+<div class="bottom-sheet" id="gymHistSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Exercise history</div>
+  <div id="gymHistFields"></div>
 </div>
 
 <!-- ===================== JAVASCRIPT ===================== -->
@@ -1742,6 +1763,8 @@ function renderStats(period) {
     }
   });
   document.getElementById('statsHabitsRate').textContent = totalDaysWithHabits > 0 ? Math.round(totalHabits / totalDaysWithHabits) + '/day' : '--';
+
+  renderGymHistory();
 }
 
 function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSuffix, isPercent) {
@@ -2523,6 +2546,31 @@ function renderQuickFields(type) {
       dateRow + noteRow +
       '<button class="sheet-btn" onclick="submitQuickAdd()">Log Expense</button>' +
       '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else if (type === 'day') {
+    const dk = todayStr();
+    const dd = appData.days[dk] || {};
+    const sl = dd.sleep || {};
+    const yz = (dd.medicine || []).find(function(m){ return m.name === 'Yaz'; });
+    const done = dd.habits_completed || [];
+    let hh = '';
+    getSettingHabits().forEach(function(h, i) {
+      hh += '<label style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:14px;font-weight:600">' +
+        '<input type="checkbox" id="qaHabit' + i + '"' + (done.indexOf(h) !== -1 ? ' checked' : '') + ' style="width:20px;height:20px">' +
+        escapeHtml(h) + '</label>';
+    });
+    c.innerHTML =
+      '<div class="qa-section-label">Sleep</div>' +
+      '<div class="sheet-field"><label class="sheet-label">Bedtime</label><input class="sheet-input" id="qaBed" type="time" value="' + (sl.bedtime || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Wake time</label><input class="sheet-input" id="qaWake" type="time" value="' + (sl.waketime || '') + '"></div>' +
+      '<div class="qa-section-label">Medicine</div>' +
+      '<div class="sheet-field"><label class="sheet-label">Yaz</label><select class="sheet-input" id="qaYaz"><option value="">not logged</option><option value="yes"' + (yz && yz.taken ? ' selected' : '') + '>taken</option><option value="no"' + (yz && yz.taken === false ? ' selected' : '') + '>skipped</option></select></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Cycle day (optional)</label><input class="sheet-input" id="qaYazDay" type="number" inputmode="numeric" value="' + (yz && yz.cycle_day != null ? yz.cycle_day : '') + '"></div>' +
+      '<div class="qa-section-label">Habits</div>' + hh +
+      '<div class="qa-section-label">Together</div>' +
+      '<div class="sheet-field"><label class="sheet-label">Hubby time (min)</label><input class="sheet-input" id="qaHubby" type="number" inputmode="numeric" value="' + (dd.hubby_time_minutes != null ? dd.hubby_time_minutes : '') + '"></div>' +
+      dateRow + noteRow +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Save Day</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
   } else {
     c.innerHTML =
       '<div class="sheet-field"><label class="sheet-label">What happened?</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Showered, called a friend"></div>' +
@@ -2562,6 +2610,38 @@ function submitQuickAdd() {
     if (!day.expenses) day.expenses = [];
     day.expenses.push({ id: genId(), description: desc, amount: amt, category: valOrEmpty('qaMoneyCat'), note: valOrEmpty('qaNote') || null });
     saveData(); renderMoney(); closeQuickAdd();
+    return;
+  }
+  if (type === 'day') {
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const day = ensureDay(dateKey);
+    const bed = valOrEmpty('qaBed');
+    const wake = valOrEmpty('qaWake');
+    if (bed || wake) {
+      if (!day.sleep) day.sleep = {};
+      if (bed) day.sleep.bedtime = bed;
+      if (wake) day.sleep.waketime = wake;
+      const sn = valOrEmpty('qaNote');
+      if (sn) day.sleep.notes = sn;
+    }
+    const yaz = valOrEmpty('qaYaz');
+    if (yaz === 'yes' || yaz === 'no') {
+      if (!day.medicine) day.medicine = [];
+      const cd = numOrNull('qaYazDay');
+      const rec = { name: 'Yaz', taken: (yaz === 'yes') };
+      if (cd != null) rec.cycle_day = cd;
+      const exYaz = day.medicine.find(function(m){ return m.name === 'Yaz'; });
+      if (exYaz) Object.assign(exYaz, rec); else day.medicine.push(rec);
+    }
+    const chosen = [];
+    getSettingHabits().forEach(function(h, i) {
+      const el = document.getElementById('qaHabit' + i);
+      if (el && el.checked) chosen.push(h);
+    });
+    day.habits_completed = chosen;
+    const hb = numOrNull('qaHubby');
+    if (hb != null) day.hubby_time_minutes = hb;
+    saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
     return;
   }
   if (type === 'meal') {
@@ -2918,6 +2998,7 @@ function openSettings() {
   const c = document.getElementById('settingsFields');
   c.innerHTML =
     '<div class="sheet-field"><label class="sheet-label">Water target (ml)</label><input class="sheet-input" id="setWaterTarget" type="number" inputmode="numeric" value="' + WATER_TARGET + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Habits (one per line)</label><textarea class="sheet-input" id="setHabits" rows="8">' + escapeHtml(getSettingHabits().join('\n')) + '</textarea></div>' +
     '<button class="sheet-btn" onclick="saveSettings()">Save</button>' +
     '<button class="sheet-btn secondary" onclick="closeSettings()">Cancel</button>';
   document.getElementById('settingsOverlay').classList.add('visible');
@@ -2931,6 +3012,11 @@ function saveSettings() {
   const v = parseInt(document.getElementById('setWaterTarget').value, 10);
   if (!appData.settings) appData.settings = {};
   if (!isNaN(v) && v > 0) appData.settings.water_target_ml = v;
+  const hEl = document.getElementById('setHabits');
+  if (hEl) {
+    const list = hEl.value.split('\n').map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
+    if (list.length) appData.settings.habits = list;
+  }
   applySettings();
   saveData();
   renderHome();
@@ -3077,6 +3163,93 @@ function exportRangeFile() {
   a.click();
   URL.revokeObjectURL(url);
   status.textContent = 'Downloaded ' + arr.length + ' day(s).';
+}
+
+/* ===== GYM EXERCISE HISTORY ===== */
+let gymHistNames = [];
+function gymHistory() {
+  const map = {};
+  Object.keys(appData.days || {}).sort().forEach(function(k) {
+    const g = appData.days[k] && appData.days[k].gym;
+    if (!g || !g.exercises) return;
+    g.exercises.forEach(function(ex) {
+      if (!ex.name) return;
+      const w = (ex.weight === '' || ex.weight == null || isNaN(ex.weight)) ? null : Number(ex.weight);
+      const reps = (ex.reps || []).filter(function(r){ return r > 0; });
+      if (w == null && !reps.length) return;
+      if (!map[ex.name]) map[ex.name] = [];
+      map[ex.name].push({ date: k, day_type: g.day_type || '', week: g.week || null, weight: w, reps: reps });
+    });
+  });
+  return map;
+}
+function renderGymHistory() {
+  const c = document.getElementById('statsGymList');
+  const cnt = document.getElementById('statsGymCount');
+  if (!c) return;
+  const map = gymHistory();
+  const names = Object.keys(map).sort();
+  gymHistNames = names;
+  if (!names.length) {
+    c.innerHTML = '<div style="font-size:13px;color:#B8B5C8;padding:2px 0">Nothing logged yet. Exercises appear here once a session is saved.</div>';
+    if (cnt) cnt.textContent = '--';
+    return;
+  }
+  if (cnt) cnt.textContent = names.length + ' logged';
+  let html = '';
+  names.forEach(function(n, i) {
+    const rows = map[n];
+    const last = rows[rows.length - 1];
+    const wtxt = last.weight != null ? last.weight + ' kg' : 'bodyweight';
+    const rtxt = last.reps.length ? last.reps.join('/') : '';
+    html += '<div class="gym-hist-row" onclick="openGymHistory(' + i + ')">' +
+      '<div class="gym-hist-name">' + escapeHtml(n) + '</div>' +
+      '<div class="gym-hist-meta">' + rows.length + ' session' + (rows.length > 1 ? 's' : '') + ' &middot; last ' + wtxt + (rtxt ? ' &times; ' + rtxt : '') + '</div>' +
+      '</div>';
+  });
+  c.innerHTML = html;
+}
+function openGymHistory(i) {
+  const name = gymHistNames[i];
+  if (!name) return;
+  const rows = gymHistory()[name] || [];
+  const c = document.getElementById('gymHistFields');
+  let html = '<div class="gym-head">' + escapeHtml(name) + '</div>';
+  const weights = rows.map(function(r){ return r.weight != null ? r.weight : 0; });
+  const maxW = Math.max.apply(null, weights.concat([1]));
+  if (weights.some(function(w){ return w > 0; })) {
+    html += '<div class="mini-bar-chart" style="margin-bottom:14px">';
+    weights.forEach(function(w) {
+      const pct = Math.max(w / maxW * 100, 4);
+      html += '<div class="mini-bar" style="height:' + pct + '%;background:' + (w > 0 ? 'var(--mint)' : 'rgba(45,43,61,0.06)') + '"></div>';
+    });
+    html += '</div>';
+  }
+  rows.slice().reverse().forEach(function(r) {
+    const wtxt = r.weight != null ? r.weight + ' kg' : 'bodyweight';
+    const rtxt = r.reps.length ? r.reps.join(' / ') : 'no reps';
+    html += '<div class="gym-hist-row">' +
+      '<div class="gym-hist-name">' + r.date + (r.day_type ? ' &middot; ' + escapeHtml(r.day_type) : '') + (r.week ? ' &middot; Wk ' + r.week : '') + '</div>' +
+      '<div class="gym-hist-meta">' + wtxt + ' &times; ' + rtxt + '</div></div>';
+  });
+  html += '<button class="sheet-btn secondary" onclick="closeGymHistory()">Close</button>';
+  c.innerHTML = html;
+  document.getElementById('gymHistOverlay').classList.add('visible');
+  document.getElementById('gymHistSheet').classList.add('visible');
+}
+function closeGymHistory() {
+  document.getElementById('gymHistOverlay').classList.remove('visible');
+  document.getElementById('gymHistSheet').classList.remove('visible');
+}
+
+/* ===== HABITS SETTING ===== */
+const DEFAULT_HABITS = ['Skincare AM','Skincare PM','Prayer','Supplements','Stretch','Journal','Read','Walk','Tidy up','Heartopia'];
+function getSettingHabits() {
+  if (!appData.settings) appData.settings = {};
+  if (!Array.isArray(appData.settings.habits) || !appData.settings.habits.length) {
+    appData.settings.habits = DEFAULT_HABITS.slice();
+  }
+  return appData.settings.habits;
 }
 
 function escapeHtml(str) {
