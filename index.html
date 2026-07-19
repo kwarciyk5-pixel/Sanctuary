@@ -2682,7 +2682,8 @@ const GYM_LOADS = {
   'Farmer carry': 10, 'Suitcase carry': 10,
   'DB curl': 2.5, 'Hammer curl': 2.5, 'Incline curl': 2.5,
   'Concentration curl': 2.5, 'Cable curl': 5,
-  'pushdown': 5, 'overhead ext': 2.5, 'kickback': 2.5
+  'Cable pushdown': 5, 'Overhead triceps ext': 2.5, 'Triceps kickback': 2.5,
+  'Skullcrusher': 2.5, 'Bench dip': ''
 };
 const GYM_POOLS = {
   squat: ['Goblet squat','Sumo squat','Front-rack squat','Bulgarian split squat','DB step-up','Wall sit'],
@@ -2703,7 +2704,14 @@ const GYM_POOLS = {
   chest: ['DB incline press','Incline fly','DB flat bench','Cable crossover'],
   rear_delt: ['Rear-delt fly','Face pull'],
   arms_b: ['Hammer curl + overhead ext','Incline curl + pushdown','Hammer curl + kickback','Cable curl + overhead ext','Hammer curl + pushdown','Incline curl + kickback'],
-  core: ['Cable Pallof','Cable woodchop','Standing cable crunch','Farmer carry','Suitcase carry']
+  core: ['Cable Pallof','Cable woodchop','Standing cable crunch','Farmer carry','Suitcase carry'],
+  biceps: ['DB curl','Hammer curl','Incline curl','Cable curl','Concentration curl'],
+  triceps: ['Cable pushdown','Overhead triceps ext','Triceps kickback','Skullcrusher','Bench dip']
+};
+const ARMS_NAME_FIX = {
+  'pushdown': 'Cable pushdown',
+  'overhead ext': 'Overhead triceps ext',
+  'kickback': 'Triceps kickback'
 };
 const GYM_TEMPLATES = {
   'Lower A': [
@@ -2765,11 +2773,14 @@ function buildGymSession(dateObj, dateKey) {
       const name = slot.week[wk-1];
       if ((slot.job === 'arms_a' || slot.job === 'arms_b') && name.indexOf(' + ') !== -1) {
         const parts = name.split(' + ');
-        parts.forEach(function(p, pi) {
-          const nm = p.trim();
+        parts.forEach(function(p) {
+          const raw = p.trim();
+          const nm = ARMS_NAME_FIX[raw] || raw;
+          const lower = nm.toLowerCase();
+          const isBiceps = lower.indexOf('curl') !== -1 && lower.indexOf('skull') === -1;
           const reps = [];
           for (let i=0;i<slot.sets;i++) reps.push(slot.reps);
-          session.exercises.push({ job: slot.job, label: slot.label + ' ' + (pi+1), name: nm, weight: gymPrefillWeight(nm, dateKey), target_reps: slot.reps, reps: reps, note: '', custom: false, ss_key: name, ss_index: pi });
+          session.exercises.push({ job: isBiceps ? 'biceps' : 'triceps', label: isBiceps ? 'Biceps' : 'Triceps', name: nm, weight: gymPrefillWeight(nm, dateKey), target_reps: slot.reps, reps: reps, note: '', custom: false });
         });
       } else {
         const reps = [];
@@ -2845,24 +2856,6 @@ function gymSwap(i) {
   const ex = gymSession.exercises[i];
   const pool = GYM_POOLS[ex.job] || [];
   if (!pool.length) return;
-  if (ex.ss_key) {
-    const dateKey = gymSession.date || todayStr();
-    let sidx = pool.indexOf(ex.ss_key);
-    sidx = (sidx + 1) % pool.length;
-    const next = pool[sidx];
-    const parts = next.split(' + ');
-    const oldKey = ex.ss_key;
-    gymSession.exercises.forEach(function(e) {
-      if (e.ss_key === oldKey) {
-        const nm = (parts[e.ss_index] != null ? parts[e.ss_index] : parts[0]).trim();
-        e.name = nm;
-        e.weight = gymPrefillWeight(nm, dateKey);
-      }
-    });
-    gymSession.exercises.forEach(function(e) { if (e.ss_key === oldKey) e.ss_key = next; });
-    renderGymSheet();
-    return;
-  }
   let idx = pool.indexOf(ex.name);
   idx = (idx + 1) % pool.length;
   ex.name = pool[idx];
