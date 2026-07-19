@@ -983,6 +983,7 @@ select.sheet-input { appearance: none; }
     <div class="top-bar-actions">
       <button class="top-bar-btn" onclick="openImportSheet()" title="Import">&#128229;</button>
       <button class="top-bar-btn" onclick="exportData()" title="Export">&#128228;</button>
+      <button class="top-bar-btn" onclick="openSettings()" title="Settings">&#9881;</button>
     </div>
   </div>
 
@@ -1324,6 +1325,14 @@ select.sheet-input { appearance: none; }
   <div id="detailFields"></div>
 </div>
 
+<!-- ===================== SETTINGS SHEET ===================== -->
+<div class="sheet-overlay" id="settingsOverlay" onclick="closeSettings()"></div>
+<div class="bottom-sheet" id="settingsSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Settings</div>
+  <div id="settingsFields"></div>
+</div>
+
 <!-- ===================== JAVASCRIPT ===================== -->
 <script>
 /* ============================================
@@ -1423,6 +1432,7 @@ function updateLockDots() {
    ============================================ */
 function initApp() {
   loadData();
+  applySettings();
   selectedDate = todayStr();
   renderHome();
   renderStats();
@@ -2340,7 +2350,7 @@ function submitNewHealth() {
    UTILITIES
    ============================================ */
 /* ===== QUICK ADD + DETAIL (Paste B) ===== */
-const WATER_TARGET = 1200;
+let WATER_TARGET = 1200;
 let quickAddType = 'meal';
 let quickNutritionOpen = false;
 let detailContext = null;
@@ -2670,9 +2680,19 @@ function buildGymSession(dateObj, dateKey) {
   if (dayType && GYM_TEMPLATES[dayType]) {
     GYM_TEMPLATES[dayType].forEach(slot => {
       const name = slot.week[wk-1];
-      const reps = [];
-      for (let i=0;i<slot.sets;i++) reps.push(slot.reps);
-      session.exercises.push({ job: slot.job, label: slot.label, name: name, weight: (GYM_LOADS[name] != null ? GYM_LOADS[name] : ''), target_reps: slot.reps, reps: reps, note: '', custom: false });
+      if ((slot.job === 'arms_a' || slot.job === 'arms_b') && name.indexOf(' + ') !== -1) {
+        const parts = name.split(' + ');
+        parts.forEach(function(p, pi) {
+          const nm = p.trim();
+          const reps = [];
+          for (let i=0;i<slot.sets;i++) reps.push(slot.reps);
+          session.exercises.push({ job: slot.job, label: slot.label + ' ' + (pi+1), name: nm, weight: gymPrefillWeight(nm, dateKey), target_reps: slot.reps, reps: reps, note: '', custom: false, ss_key: name, ss_index: pi });
+        });
+      } else {
+        const reps = [];
+        for (let i=0;i<slot.sets;i++) reps.push(slot.reps);
+        session.exercises.push({ job: slot.job, label: slot.label, name: name, weight: gymPrefillWeight(name, dateKey), target_reps: slot.reps, reps: reps, note: '', custom: false });
+      }
     });
   }
   return session;
@@ -2742,10 +2762,28 @@ function gymSwap(i) {
   const ex = gymSession.exercises[i];
   const pool = GYM_POOLS[ex.job] || [];
   if (!pool.length) return;
+  if (ex.ss_key) {
+    const dateKey = gymSession.date || todayStr();
+    let sidx = pool.indexOf(ex.ss_key);
+    sidx = (sidx + 1) % pool.length;
+    const next = pool[sidx];
+    const parts = next.split(' + ');
+    const oldKey = ex.ss_key;
+    gymSession.exercises.forEach(function(e) {
+      if (e.ss_key === oldKey) {
+        const nm = (parts[e.ss_index] != null ? parts[e.ss_index] : parts[0]).trim();
+        e.name = nm;
+        e.weight = gymPrefillWeight(nm, dateKey);
+      }
+    });
+    gymSession.exercises.forEach(function(e) { if (e.ss_key === oldKey) e.ss_key = next; });
+    renderGymSheet();
+    return;
+  }
   let idx = pool.indexOf(ex.name);
   idx = (idx + 1) % pool.length;
   ex.name = pool[idx];
-  if (GYM_LOADS[ex.name] != null) ex.weight = GYM_LOADS[ex.name];
+  ex.weight = gymPrefillWeight(ex.name, gymSession.date || todayStr());
   renderGymSheet();
 }
 
@@ -2791,6 +2829,57 @@ function saveGym() {
   selectedDate = dateKey;
   renderHome(); renderStats();
   closeGym();
+}
+
+/* ===== SETTINGS ===== */
+function applySettings() {
+  if (!appData.settings) appData.settings = {};
+  if (appData.settings.water_target_ml == null) appData.settings.water_target_ml = 1200;
+  const v = parseInt(appData.settings.water_target_ml, 10);
+  WATER_TARGET = (!isNaN(v) && v > 0) ? v : 1200;
+}
+function openSettings() {
+  const c = document.getElementById('settingsFields');
+  c.innerHTML =
+    '<div class="sheet-field"><label class="sheet-label">Water target (ml)</label><input class="sheet-input" id="setWaterTarget" type="number" inputmode="numeric" value="' + WATER_TARGET + '"></div>' +
+    '<button class="sheet-btn" onclick="saveSettings()">Save</button>' +
+    '<button class="sheet-btn secondary" onclick="closeSettings()">Cancel</button>';
+  document.getElementById('settingsOverlay').classList.add('visible');
+  document.getElementById('settingsSheet').classList.add('visible');
+}
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('visible');
+  document.getElementById('settingsSheet').classList.remove('visible');
+}
+function saveSettings() {
+  const v = parseInt(document.getElementById('setWaterTarget').value, 10);
+  if (!appData.settings) appData.settings = {};
+  if (!isNaN(v) && v > 0) appData.settings.water_target_ml = v;
+  applySettings();
+  saveData();
+  renderHome();
+  renderStats();
+  closeSettings();
+}
+
+/* ===== GYM: last-logged load prefill ===== */
+function gymLastLoggedWeight(name, beforeDateKey) {
+  if (!name) return null;
+  const keys = Object.keys(appData.days || {}).filter(function(k) { return k < beforeDateKey; }).sort().reverse();
+  for (let i = 0; i < keys.length; i++) {
+    const g = appData.days[keys[i]] && appData.days[keys[i]].gym;
+    if (!g || !g.exercises) continue;
+    for (let j = 0; j < g.exercises.length; j++) {
+      const ex = g.exercises[j];
+      if (ex.name === name && ex.weight !== '' && ex.weight != null && !isNaN(ex.weight)) return ex.weight;
+    }
+  }
+  return null;
+}
+function gymPrefillWeight(name, dateKey) {
+  const last = gymLastLoggedWeight(name, dateKey);
+  if (last != null) return last;
+  return (GYM_LOADS[name] != null ? GYM_LOADS[name] : '');
 }
 
 function genId() {
