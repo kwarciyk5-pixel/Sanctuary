@@ -936,6 +936,21 @@ select.sheet-input { appearance: none; }
 .gym-note { width: 100%; margin-top: 8px; padding: 8px; border-radius: 10px; border: 1.5px solid rgba(45,43,61,0.08); font-size: 13px; }
 .gym-addex { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: var(--radius-md); background: var(--bg); font-size: 13px; font-weight: 700; color: var(--lavender-deep); }
 
+/* ===== TIMELINE DAY BOUNDARY + DOTS (Paste D) ===== */
+.timeline-divider {
+  display: flex; align-items: center; gap: 8px;
+  margin: 4px 0 14px -22px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.timeline-divider::after {
+  content: ''; flex: 1; height: 1px;
+  background: rgba(45,43,61,0.08);
+}
+.timeline-dot.gym { background: var(--mint-deep); }
+.timeline-dot.water { background: var(--sky-deep); }
+.task-cat-badge { background: var(--lavender-deep); }
+
 /* ============================================
    RESPONSIVE
    ============================================ */
@@ -982,7 +997,7 @@ select.sheet-input { appearance: none; }
     <div class="top-bar-title">Sanctuary</div>
     <div class="top-bar-actions">
       <button class="top-bar-btn" onclick="openImportSheet()" title="Import">&#128229;</button>
-      <button class="top-bar-btn" onclick="exportData()" title="Export">&#128228;</button>
+      <button class="top-bar-btn" onclick="openExportSheet()" title="Export">&#128228;</button>
       <button class="top-bar-btn" onclick="openSettings()" title="Settings">&#9881;</button>
     </div>
   </div>
@@ -1333,6 +1348,22 @@ select.sheet-input { appearance: none; }
   <div id="settingsFields"></div>
 </div>
 
+<!-- ===================== EXPORT SHEET ===================== -->
+<div class="sheet-overlay" id="exportOverlay" onclick="closeExportSheet()"></div>
+<div class="bottom-sheet" id="exportSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">&#128228; Export</div>
+  <div id="exportFields"></div>
+</div>
+
+<!-- ===================== CUSTOM RANGE SHEET ===================== -->
+<div class="sheet-overlay" id="rangeOverlay" onclick="closeCustomRange()"></div>
+<div class="bottom-sheet" id="rangeSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Custom range</div>
+  <div id="rangeFields"></div>
+</div>
+
 <!-- ===================== JAVASCRIPT ===================== -->
 <script>
 /* ============================================
@@ -1587,10 +1618,15 @@ function renderTimeline(dayData) {
   }
 
   let html = '<div class="timeline">';
-  const sorted = [...dayData.entries].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  const sorted = [...dayData.entries].sort((a, b) => dayOrder(a.time) - dayOrder(b.time));
+  let crossedMidnight = false;
 
   sorted.forEach(entry => {
-    const cat = entry.category || 'other';
+    if (!crossedMidnight && dayOrder(entry.time) >= 1440) {
+      html += '<div class="timeline-divider"><span>past midnight</span></div>';
+      crossedMidnight = true;
+    }
+    const cat = entryDotClass(entry);
     const clickAttr = entry.id ? ' onclick="openEntryDetail(\'' + selectedDate + '\',\'' + entry.id + '\')" style="cursor:pointer"' : '';
     html += '<div class="timeline-entry"' + clickAttr + '>';
     html += '<div class="timeline-dot ' + cat + '"></div>';
@@ -1639,11 +1675,13 @@ function renderDailySummary(dayData) {
 function setStatsPeriod(period, btn) {
   document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (period === 'custom') { openCustomRange(); return; }
   renderStats(period);
 }
 
 function renderStats(period) {
-  period = period || 'week';
+  period = period || currentStatsPeriod || 'week';
+  currentStatsPeriod = period;
   const dates = getDateRange(period);
 
   // Water bars
@@ -1734,12 +1772,26 @@ function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSu
 
 function getDateRange(period) {
   const dates = [];
+  if (period === 'custom' && statsCustomRange && statsCustomRange.from && statsCustomRange.to) {
+    const start = new Date(statsCustomRange.from + 'T00:00:00');
+    const end = new Date(statsCustomRange.to + 'T00:00:00');
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
+      const cur = new Date(start);
+      let guard = 0;
+      while (cur <= end && guard < 400) {
+        dates.push(fmtDateKey(cur));
+        cur.setDate(cur.getDate() + 1);
+        guard++;
+      }
+      return dates;
+    }
+  }
   const today = new Date(todayStr() + 'T00:00:00');
   const days = period === 'month' ? 30 : 7;
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    dates.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    dates.push(fmtDateKey(d));
   }
   return dates;
 }
@@ -1810,7 +1862,25 @@ function filterTasks(cat, btn) {
 }
 
 function updateTaskBadges() {
-  // Simple badge implementation — could be expanded
+  const cats = ['all', 'trading', 'home', 'health', 'social', 'groceries'];
+  const pills = document.querySelectorAll('.task-cat-pill');
+  const tasks = appData.tasks || [];
+  pills.forEach(function(pill, i) {
+    const old = pill.querySelector('.task-cat-badge');
+    if (old) old.parentNode.removeChild(old);
+    const cat = cats[i];
+    if (!cat) return;
+    const n = tasks.filter(function(t) {
+      if (t.completed) return false;
+      return cat === 'all' ? true : t.category === cat;
+    }).length;
+    if (n > 0) {
+      const b = document.createElement('span');
+      b.className = 'task-cat-badge';
+      b.textContent = n;
+      pill.appendChild(b);
+    }
+  });
 }
 
 function addTask(text, category, priority, deadline) {
@@ -1937,6 +2007,7 @@ function renderHealth() {
     html += '<div class="health-entry-date">' + (entry.date_noticed || '') + (entry.category ? ' \u00b7 ' + entry.category : '') + '</div>';
     if (entry.suspected_cause) html += '<div class="health-entry-desc">Suspected: ' + escapeHtml(entry.suspected_cause) + '</div>';
     if (entry.treatment) html += '<div class="health-entry-desc">Treatment: ' + escapeHtml(entry.treatment) + '</div>';
+    if (entry.note) html += '<div class="health-entry-desc">Note: ' + escapeHtml(entry.note) + '</div>';
     const sClass = entry.status === 'active' ? 'active-s' : (entry.status === 'monitoring' ? 'monitoring-s' : 'resolved-s');
     html += '<div class="health-entry-status ' + sClass + '">' + (entry.status || 'active') + '</div>';
     html += '</div>';
@@ -2699,9 +2770,9 @@ function buildGymSession(dateObj, dateKey) {
 }
 
 function openGym() {
-  const dateKey = todayStr();
+  const dateKey = selectedDate || todayStr();
   const existing = appData.days[dateKey] && appData.days[dateKey].gym;
-  gymSession = existing ? JSON.parse(JSON.stringify(existing)) : buildGymSession(new Date(), dateKey);
+  gymSession = existing ? JSON.parse(JSON.stringify(existing)) : buildGymSession(new Date(dateKey + 'T00:00:00'), dateKey);
   renderGymSheet();
   document.getElementById('gymOverlay').classList.add('visible');
   document.getElementById('gymSheet').classList.add('visible');
@@ -2884,6 +2955,123 @@ function gymPrefillWeight(name, dateKey) {
 
 function genId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
+}
+
+/* ===== TIMELINE DAY ORDERING (wake-to-sleep, not midnight) ===== */
+const DAY_BOUNDARY_HOUR = 6;
+function dayOrder(t) {
+  if (!t) return -1;
+  const p = String(t).split(':');
+  const h = parseInt(p[0], 10);
+  const m = parseInt(p[1], 10) || 0;
+  if (isNaN(h)) return -1;
+  return (h < DAY_BOUNDARY_HOUR ? h + 24 : h) * 60 + m;
+}
+function entryDotClass(entry) {
+  const tags = entry.tags || [];
+  if (tags.indexOf('gym') !== -1) return 'gym';
+  if (tags.indexOf('water') !== -1) return 'water';
+  return entry.category || 'other';
+}
+
+/* ===== SCOPED EXPORT + CUSTOM RANGE (Paste E) ===== */
+let currentStatsPeriod = 'week';
+let statsCustomRange = null;
+
+function fmtDateKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function openCustomRange() {
+  const c = document.getElementById('rangeFields');
+  const to = todayStr();
+  const fromD = new Date(to + 'T00:00:00');
+  fromD.setDate(fromD.getDate() - 13);
+  const from = (statsCustomRange && statsCustomRange.from) || fmtDateKey(fromD);
+  const toV = (statsCustomRange && statsCustomRange.to) || to;
+  c.innerHTML =
+    '<div class="sheet-field"><label class="sheet-label">From</label><input class="sheet-input" id="rgFrom" type="date" value="' + from + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">To</label><input class="sheet-input" id="rgTo" type="date" value="' + toV + '"></div>' +
+    '<button class="sheet-btn" onclick="applyCustomRange()">Show</button>' +
+    '<button class="sheet-btn secondary" onclick="closeCustomRange()">Cancel</button>';
+  document.getElementById('rangeOverlay').classList.add('visible');
+  document.getElementById('rangeSheet').classList.add('visible');
+}
+function closeCustomRange() {
+  document.getElementById('rangeOverlay').classList.remove('visible');
+  document.getElementById('rangeSheet').classList.remove('visible');
+}
+function applyCustomRange() {
+  const from = valOrEmpty('rgFrom');
+  const to = valOrEmpty('rgTo');
+  if (!from || !to || to < from) return;
+  statsCustomRange = { from: from, to: to };
+  closeCustomRange();
+  renderStats('custom');
+}
+
+function openExportSheet() {
+  const c = document.getElementById('exportFields');
+  const to = todayStr();
+  const fromD = new Date(to + 'T00:00:00');
+  fromD.setDate(fromD.getDate() - 6);
+  c.innerHTML =
+    '<div class="sheet-field"><label class="sheet-label">From</label><input class="sheet-input" id="exFrom" type="date" value="' + fmtDateKey(fromD) + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">To</label><input class="sheet-input" id="exTo" type="date" value="' + to + '"></div>' +
+    '<button class="sheet-btn" onclick="exportRangeCopy()">Copy JSON for Claude</button>' +
+    '<button class="sheet-btn secondary" onclick="exportRangeFile()">Download this range</button>' +
+    '<button class="sheet-btn secondary" onclick="exportData()">Full backup (everything)</button>' +
+    '<button class="sheet-btn secondary" onclick="closeExportSheet()">Cancel</button>' +
+    '<div id="exStatus" style="font-size:12px;color:#8E8BA3;text-align:center;margin-top:8px"></div>' +
+    '<textarea id="exOut" class="import-textarea" style="display:none;margin-top:10px"></textarea>';
+  document.getElementById('exportOverlay').classList.add('visible');
+  document.getElementById('exportSheet').classList.add('visible');
+}
+function closeExportSheet() {
+  document.getElementById('exportOverlay').classList.remove('visible');
+  document.getElementById('exportSheet').classList.remove('visible');
+}
+function buildExportRange() {
+  const from = valOrEmpty('exFrom');
+  const to = valOrEmpty('exTo');
+  const out = [];
+  Object.keys(appData.days || {}).sort().forEach(function(k) {
+    if (from && k < from) return;
+    if (to && k > to) return;
+    out.push(Object.assign({ date: k }, appData.days[k]));
+  });
+  return out;
+}
+function exportRangeCopy() {
+  const arr = buildExportRange();
+  const status = document.getElementById('exStatus');
+  if (!arr.length) { status.textContent = 'No days in that range.'; return; }
+  const text = JSON.stringify(arr, null, 2);
+  const ta = document.getElementById('exOut');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      status.textContent = 'Copied ' + arr.length + ' day(s) to clipboard.';
+    }).catch(function() {
+      ta.style.display = 'block'; ta.value = text; ta.select();
+      status.textContent = 'Select and copy the text below.';
+    });
+  } else {
+    ta.style.display = 'block'; ta.value = text; ta.select();
+    status.textContent = 'Select and copy the text below.';
+  }
+}
+function exportRangeFile() {
+  const arr = buildExportRange();
+  const status = document.getElementById('exStatus');
+  if (!arr.length) { status.textContent = 'No days in that range.'; return; }
+  const blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sanctuary-' + valOrEmpty('exFrom') + '_to_' + valOrEmpty('exTo') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  status.textContent = 'Downloaded ' + arr.length + ' day(s).';
 }
 
 function escapeHtml(str) {
