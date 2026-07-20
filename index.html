@@ -960,6 +960,20 @@ select.sheet-input { appearance: none; }
   .bottom-sheet { max-width: 500px; left: 50%; transform: translateX(-50%) translateY(100%); }
   .bottom-sheet.visible { transform: translateX(-50%) translateY(0); }
 }
+/* --- hg: habits grid (Piece 2) --- */
+#statsHabitsGrid { display: block; }
+.hg-wrap { display: flex; flex-direction: column; gap: 4px; }
+.hg-row { display: flex; align-items: center; gap: 8px; }
+.hg-label { flex: 0 0 88px; font-size: 11px; opacity: .75; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hg-cells { flex: 1; display: flex; gap: 3px; }
+.hg-cell { flex: 1; aspect-ratio: 1; border-radius: 4px; background: rgba(128,128,128,.13); }
+.hg-cell.hg-done { background: #b9a6e0; }
+.hg-cell.hg-partial { background: rgba(185,166,224,.45); }
+.hg-cell.hg-na { background: transparent; }
+.hg-daylabel { background: none; font-size: 9px; opacity: .45; text-align: center; aspect-ratio: auto; }
+.hg-compact .hg-cell { border-radius: 50%; max-width: 7px; }
+.hg-compact .hg-cells { gap: 2px; }
+.hg-toggle { align-self: flex-end; font-size: 10px; opacity: .5; padding: 2px 4px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -1743,6 +1757,7 @@ function renderStats(period) {
     }
   });
   document.getElementById('statsHabitsRate').textContent = totalDaysWithHabits > 0 ? Math.round(totalHabits / totalDaysWithHabits) + '/day' : '--';
+  renderHabitsGrid();
 }
 
 function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSuffix, isPercent) {
@@ -3202,6 +3217,180 @@ function escapeHtml(str) {
    ============================================ */
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function() {});
+}
+
+/* ===== HABITS GRID (Piece 2) ===== */
+var HG_EXTRA_OPEN = false;
+var HG_MED_OPEN = false;
+
+function hgKey(d) {
+  if (typeof d === 'string') return d;
+  if (d instanceof Date) {
+    if (typeof fmtDateKey === 'function') return fmtDateKey(d);
+    var m = String(d.getMonth() + 1); if (m.length < 2) m = '0' + m;
+    var dd = String(d.getDate()); if (dd.length < 2) dd = '0' + dd;
+    return d.getFullYear() + '-' + m + '-' + dd;
+  }
+  return String(d);
+}
+
+function hgDay(dateKey) {
+  return (appData && appData.days && appData.days[dateKey]) ? appData.days[dateKey] : null;
+}
+
+function hgHabitDone(day, name) {
+  if (!day || !day.habits_completed) return false;
+  var target = String(name).toLowerCase();
+  for (var i = 0; i < day.habits_completed.length; i++) {
+    if (String(day.habits_completed[i]).toLowerCase() === target) return true;
+  }
+  return false;
+}
+
+function hgMedRow(day, medName) {
+  if (!day || !day.medicine) return null;
+  var target = String(medName).toLowerCase();
+  for (var i = 0; i < day.medicine.length; i++) {
+    var m = day.medicine[i];
+    if (m && String(m.name).toLowerCase() === target) return m;
+  }
+  return null;
+}
+
+function hgActiveMeds(dateKey) {
+  var out = [];
+  if (typeof MED_PROTOCOL === 'undefined' || !MED_PROTOCOL) return out;
+  for (var i = 0; i < MED_PROTOCOL.length; i++) {
+    var med = MED_PROTOCOL[i];
+    if (!med) continue;
+    if (!med.start || dateKey >= med.start) out.push(med);
+  }
+  return out;
+}
+
+function hgMedicineState(dateKey) {
+  var meds = hgActiveMeds(dateKey);
+  if (!meds.length) return 'na';
+  var day = hgDay(dateKey);
+  if (!day) return 'none';
+  var taken = 0;
+  for (var i = 0; i < meds.length; i++) {
+    var r = hgMedRow(day, meds[i].name);
+    if (r && r.taken) taken++;
+  }
+  if (taken === 0) return 'none';
+  if (taken === meds.length) return 'done';
+  return 'partial';
+}
+
+function hgCellState(row, dateKey) {
+  var day = hgDay(dateKey);
+  if (row.type === 'habit') return hgHabitDone(day, row.name) ? 'done' : 'none';
+  if (row.type === 'expenses') return (day && day.expenses && day.expenses.length) ? 'done' : 'none';
+  if (row.type === 'medicine') return hgMedicineState(dateKey);
+  if (row.type === 'med_item') {
+    if (row.start && dateKey < row.start) return 'na';
+    var r = hgMedRow(day, row.name);
+    return (r && r.taken) ? 'done' : 'none';
+  }
+  return 'none';
+}
+
+function hgCoreRows() {
+  return [
+    { label: 'Buddha offerings', type: 'habit', name: 'Buddha offerings' },
+    { label: 'Make bed', type: 'habit', name: 'Make bed' },
+    { label: 'Tooth brush', type: 'habit', name: 'Tooth brush' },
+    { label: 'Shower', type: 'habit', name: 'Shower' },
+    { label: 'Retinol', type: 'habit', name: 'Retinol' },
+    { label: 'Prayers', type: 'habit', name: 'Prayers' },
+    { label: 'Medicine', type: 'medicine' }
+  ];
+}
+
+function hgExtraRows() {
+  return [
+    { label: 'Clean home', type: 'habit', name: 'Clean home' },
+    { label: 'Iron', type: 'habit', name: 'Iron' },
+    { label: 'Track expenses', type: 'expenses' }
+  ];
+}
+
+function hgMedSubRows(dateKeys) {
+  var out = [];
+  if (typeof MED_PROTOCOL === 'undefined' || !MED_PROTOCOL) return out;
+  var last = dateKeys.length ? dateKeys[dateKeys.length - 1] : '';
+  for (var i = 0; i < MED_PROTOCOL.length; i++) {
+    var med = MED_PROTOCOL[i];
+    if (!med) continue;
+    if (med.start && last && last < med.start) continue;
+    out.push({ label: '\u00b7 ' + med.name, type: 'med_item', name: med.name, start: med.start || '' });
+  }
+  return out;
+}
+
+function hgToggleExtra() { HG_EXTRA_OPEN = !HG_EXTRA_OPEN; renderHabitsGrid(); }
+function hgToggleMed() { HG_MED_OPEN = !HG_MED_OPEN; renderHabitsGrid(); }
+
+function hgWeekdayLetter(dateKey) {
+  var p = String(dateKey).split('-');
+  var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][d.getDay()];
+}
+
+function hgRowHtml(row, dateKeys, compact) {
+  var h = '<div class="hg-row">';
+  h += '<div class="hg-label">' + escapeHtml(row.label) + '</div>';
+  h += '<div class="hg-cells">';
+  for (var i = 0; i < dateKeys.length; i++) {
+    var st = hgCellState(row, dateKeys[i]);
+    h += '<div class="hg-cell hg-' + st + (compact ? ' hg-dot' : '') + '"></div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function renderHabitsGrid() {
+  var el = document.getElementById('statsHabitsGrid');
+  if (!el) return;
+  var period = (typeof currentStatsPeriod !== 'undefined') ? currentStatsPeriod : 'week';
+  var raw = [];
+  try { raw = getDateRange(period) || []; } catch (e) { raw = []; }
+  var dateKeys = [];
+  for (var i = 0; i < raw.length; i++) dateKeys.push(hgKey(raw[i]));
+  if (!dateKeys.length) { el.innerHTML = ''; return; }
+
+  var compact = dateKeys.length > 10;
+  var html = '<div class="hg-wrap' + (compact ? ' hg-compact' : '') + '">';
+
+  if (!compact) {
+    html += '<div class="hg-row hg-head"><div class="hg-label"></div><div class="hg-cells">';
+    for (var j = 0; j < dateKeys.length; j++) {
+      html += '<div class="hg-cell hg-daylabel">' + hgWeekdayLetter(dateKeys[j]) + '</div>';
+    }
+    html += '</div></div>';
+  }
+
+  var core = hgCoreRows();
+  for (var k = 0; k < core.length; k++) {
+    html += hgRowHtml(core[k], dateKeys, compact);
+    if (core[k].type === 'medicine') {
+      html += '<div class="hg-toggle" onclick="hgToggleMed()">' + (HG_MED_OPEN ? 'hide items' : 'show items') + '</div>';
+      if (HG_MED_OPEN) {
+        var subs = hgMedSubRows(dateKeys);
+        for (var s = 0; s < subs.length; s++) html += hgRowHtml(subs[s], dateKeys, compact);
+      }
+    }
+  }
+
+  html += '<div class="hg-toggle" onclick="hgToggleExtra()">' + (HG_EXTRA_OPEN ? 'less' : 'more') + '</div>';
+  if (HG_EXTRA_OPEN) {
+    var ex = hgExtraRows();
+    for (var m = 0; m < ex.length; m++) html += hgRowHtml(ex[m], dateKeys, compact);
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
 }
 </script>
 </body>
