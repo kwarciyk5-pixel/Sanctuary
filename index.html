@@ -1313,6 +1313,7 @@ select.sheet-input { appearance: none; }
     <button class="qa-chip" data-type="water" onclick="selectQuickType('water', this)">&#128167; Water</button>
     <button class="qa-chip" data-type="health" onclick="selectQuickType('health', this)">&#129657; Health</button>
     <button class="qa-chip" data-type="money" onclick="selectQuickType('money', this)">&#128176; Money</button>
+    <button class="qa-chip" data-type="day" onclick="selectQuickType('day', this)">&#128197; Day</button>
     <button class="qa-chip" data-type="misc" onclick="selectQuickType('misc', this)">&#9728;&#65039; Misc</button>
   </div>
   <div id="quickAddFields"></div>
@@ -2440,6 +2441,67 @@ function valOrEmpty(id) {
   const el = document.getElementById(id);
   return el ? el.value.trim() : '';
 }
+var MED_PROTOCOL = [
+  { key: 'yaz', name: 'Yaz', start: '2000-01-01', cycle: true },
+  { key: 'mag', name: 'Magnesium citrate', start: '2026-07-19', cycle: false },
+  { key: 'vitd', name: 'Vitamin D3 5000 IU', start: '2026-07-20', cycle: false },
+  { key: 'omega', name: 'Omega-3', start: '2026-07-24', cycle: false }
+];
+var YAZ_PACK_START = '2026-07-04';
+var YAZ_CYCLE_LEN = 28;
+var HABIT_LIST = ['Buddha offerings', 'Make bed', 'Tooth brush', 'Shower', 'Retinol', 'Prayers', 'Clean home', 'Iron'];
+
+function yazCycleDay(dateKey) {
+  var a = new Date(YAZ_PACK_START + 'T00:00:00');
+  var b = new Date(dateKey + 'T00:00:00');
+  var diff = Math.floor((b - a) / 86400000);
+  if (isNaN(diff)) return null;
+  var d = ((diff % YAZ_CYCLE_LEN) + YAZ_CYCLE_LEN) % YAZ_CYCLE_LEN;
+  return d + 1;
+}
+
+function medActive(med, dateKey) { return dateKey >= med.start; }
+
+function medRecord(day, name) {
+  if (!day || !day.medicine) return null;
+  var i;
+  for (i = 0; i < day.medicine.length; i++) { if (day.medicine[i].name === name) return day.medicine[i]; }
+  return null;
+}
+
+function renderDayFields(dateKey) {
+  var wrap = document.getElementById('qaDayWrap');
+  if (!wrap) return;
+  var d0 = appData.days[dateKey] || {};
+  var sl = d0.sleep || {};
+  var medRows = '';
+  MED_PROTOCOL.forEach(function (m) {
+    if (!medActive(m, dateKey)) return;
+    var rec = medRecord(d0, m.name);
+    var ck = (rec && rec.taken) ? ' checked' : '';
+    medRows += '<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:15px"><input type="checkbox" id="qaMed_' + m.key + '"' + ck + ' style="width:20px;height:20px;flex:none"><span>' + m.name + '</span></label>';
+    if (m.cycle) {
+      var cd = (rec && rec.cycle_day) ? rec.cycle_day : yazCycleDay(dateKey);
+      medRows += '<div class="sheet-field"><label class="sheet-label">Yaz cycle day</label><input class="sheet-input" id="qaYazCycle" type="number" inputmode="numeric" value="' + (cd === null ? '' : cd) + '"></div>';
+    }
+  });
+  var done = d0.habits_completed || [];
+  var habitRows = '';
+  HABIT_LIST.forEach(function (h, i) {
+    var ck = done.indexOf(h) >= 0 ? ' checked' : '';
+    habitRows += '<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:15px"><input type="checkbox" id="qaHabit_' + i + '"' + ck + ' style="width:20px;height:20px;flex:none"><span>' + h + '</span></label>';
+  });
+  wrap.innerHTML =
+    '<div class="sheet-field"><label class="sheet-label">Date</label><input class="sheet-input" id="qaDate" type="date" value="' + dateKey + '" onchange="renderDayFields(this.value)"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Bedtime</label><input class="sheet-input" id="qaBedtime" type="time" value="' + (sl.bedtime || '') + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Waketime</label><input class="sheet-input" id="qaWaketime" type="time" value="' + (sl.waketime || '') + '"></div>' +
+    '<div class="sheet-label" style="margin-top:16px;margin-bottom:2px;font-weight:600">Medicine</div>' + medRows +
+    '<div class="sheet-label" style="margin-top:16px;margin-bottom:2px;font-weight:600">Habits</div>' + habitRows +
+    '<div class="sheet-field"><label class="sheet-label">Sleep note (optional)</label><input class="sheet-input" id="qaNote" placeholder="anything to remember" value="' + (sl.notes ? String(sl.notes).replace(/"/g, '&quot;') : '') + '"></div>' +
+    '<button class="sheet-btn" onclick="submitQuickAdd()">Save Day</button>' +
+    '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+}
+
 function ensureDay(dateKey) {
   if (!appData.days[dateKey]) appData.days[dateKey] = {};
   return appData.days[dateKey];
@@ -2523,6 +2585,9 @@ function renderQuickFields(type) {
       dateRow + noteRow +
       '<button class="sheet-btn" onclick="submitQuickAdd()">Log Expense</button>' +
       '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
+  } else if (type === 'day') {
+    c.innerHTML = '<div id="qaDayWrap"></div>';
+    renderDayFields(todayStr());
   } else {
     c.innerHTML =
       '<div class="sheet-field"><label class="sheet-label">What happened?</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Showered, called a friend"></div>' +
@@ -2562,6 +2627,53 @@ function submitQuickAdd() {
     if (!day.expenses) day.expenses = [];
     day.expenses.push({ id: genId(), description: desc, amount: amt, category: valOrEmpty('qaMoneyCat'), note: valOrEmpty('qaNote') || null });
     saveData(); renderMoney(); closeQuickAdd();
+    return;
+  }
+  if (type === 'day') {
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const day = ensureDay(dateKey);
+    var bed = valOrEmpty('qaBedtime');
+    var wake = valOrEmpty('qaWaketime');
+    var dnote = valOrEmpty('qaNote') || null;
+    if (bed || wake || dnote) {
+      if (!day.sleep) day.sleep = {};
+      if (bed) day.sleep.bedtime = bed;
+      if (wake) day.sleep.waketime = wake;
+      day.sleep.notes = dnote;
+    }
+    if (!day.medicine) day.medicine = [];
+    if (!day.entries) day.entries = [];
+    MED_PROTOCOL.forEach(function (m) {
+      var box = document.getElementById('qaMed_' + m.key);
+      if (!box) return;
+      var taken = !!box.checked;
+      var rec = medRecord(day, m.name);
+      if (!rec) { rec = { name: m.name }; day.medicine.push(rec); }
+      rec.taken = taken;
+      if (m.cycle) {
+        var cd = numOrNull('qaYazCycle');
+        rec.cycle_day = (cd === null) ? yazCycleDay(dateKey) : cd;
+      }
+      var eid = 'med-' + dateKey + '-' + m.key;
+      var idx = -1, k;
+      for (k = 0; k < day.entries.length; k++) { if (day.entries[k].id === eid) { idx = k; break; } }
+      if (taken) {
+        var ent = { id: eid, time: nowTime(), text: 'Took ' + m.name, category: 'other', tags: ['medicine'], note: null };
+        if (idx >= 0) { ent.time = day.entries[idx].time; day.entries[idx] = ent; }
+        else { day.entries.push(ent); }
+      } else if (idx >= 0) {
+        day.entries.splice(idx, 1);
+      }
+    });
+    var doneList = [];
+    HABIT_LIST.forEach(function (h, i) {
+      var hbox = document.getElementById('qaHabit_' + i);
+      if (hbox && hbox.checked) doneList.push(h);
+    });
+    var prev = day.habits_completed || [];
+    prev.forEach(function (h) { if (HABIT_LIST.indexOf(h) < 0 && doneList.indexOf(h) < 0) doneList.push(h); });
+    day.habits_completed = doneList;
+    saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
     return;
   }
   if (type === 'meal') {
