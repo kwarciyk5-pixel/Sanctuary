@@ -947,6 +947,16 @@ select.sheet-input { appearance: none; }
   content: ''; flex: 1; height: 1px;
   background: rgba(45,43,61,0.08);
 }
+.pm-divider {
+  display: block;
+  margin: 10px 0 8px 0;
+  padding: 4px 0 2px 0;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; color: var(--text-muted);
+  border-top: 1px dashed rgba(45,43,61,0.15);
+  text-align: left;
+}
+.pm-divider span { display: inline-block; }
 .timeline-dot.gym { background: var(--mint-deep); }
 .timeline-dot.water { background: var(--sky-deep); }
 .task-cat-badge { background: var(--lavender-deep); }
@@ -974,6 +984,31 @@ select.sheet-input { appearance: none; }
 .hg-compact .hg-cell { border-radius: 50%; max-width: 7px; }
 .hg-compact .hg-cells { gap: 2px; }
 .hg-toggle { align-self: flex-end; font-size: 10px; opacity: .5; padding: 2px 4px; cursor: pointer; }
+
+/* --- dz: danger zone (Clear all data) --- */
+.dz-section {
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(45,43,61,0.1);
+}
+.dz-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; color: #b23a3a;
+  margin-bottom: 6px;
+}
+.dz-note {
+  font-size: 12px; color: var(--text-secondary);
+  margin-bottom: 12px; line-height: 1.4;
+}
+.dz-btn {
+  width: 100%; padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: #ffe1e1;
+  color: #a02020;
+  font-size: 14px; font-weight: 700;
+  border: 1.5px solid #f0b3b3;
+}
+.dz-btn:active { background: #ffd0d0; }
 </style>
 </head>
 <body>
@@ -1323,12 +1358,12 @@ select.sheet-input { appearance: none; }
   <div class="sheet-handle"></div>
   <div class="sheet-title">&#10133; Quick Log</div>
   <div class="qa-chips">
-    <button class="qa-chip active" data-type="meal" onclick="selectQuickType('meal', this)">&#127860; Meal</button>
+    <button class="qa-chip active" data-type="misc" onclick="selectQuickType('misc', this)">&#9728;&#65039; Misc</button>
+    <button class="qa-chip" data-type="meal" onclick="selectQuickType('meal', this)">&#127860; Meal</button>
     <button class="qa-chip" data-type="water" onclick="selectQuickType('water', this)">&#128167; Water</button>
+    <button class="qa-chip" data-type="day" onclick="selectQuickType('day', this)">&#128197; Day</button>
     <button class="qa-chip" data-type="health" onclick="selectQuickType('health', this)">&#129657; Health</button>
     <button class="qa-chip" data-type="money" onclick="selectQuickType('money', this)">&#128176; Money</button>
-    <button class="qa-chip" data-type="day" onclick="selectQuickType('day', this)">&#128197; Day</button>
-    <button class="qa-chip" data-type="misc" onclick="selectQuickType('misc', this)">&#9728;&#65039; Misc</button>
   </div>
   <div id="quickAddFields"></div>
 </div>
@@ -1633,13 +1668,20 @@ function renderTimeline(dayData) {
   }
 
   let html = '<div class="timeline">';
-  const sorted = [...dayData.entries].sort((a, b) => dayOrder(a.time) - dayOrder(b.time));
-  let crossedMidnight = false;
+  const mainBlock = [];
+  const postMidBlock = [];
+  dayData.entries.forEach(e => {
+    if (dayOrder(e.time) >= 1440) postMidBlock.push(e);
+    else mainBlock.push(e);
+  });
+  mainBlock.sort((a, b) => dayOrder(b.time) - dayOrder(a.time));
+  postMidBlock.sort((a, b) => dayOrder(b.time) - dayOrder(a.time));
+  const sorted = mainBlock.concat(postMidBlock);
+  const dividerAt = mainBlock.length;
 
-  sorted.forEach(entry => {
-    if (!crossedMidnight && dayOrder(entry.time) >= 1440) {
-      html += '<div class="timeline-divider"><span>past midnight</span></div>';
-      crossedMidnight = true;
+  sorted.forEach((entry, idx) => {
+    if (idx === dividerAt && postMidBlock.length > 0) {
+      html += '<div class="pm-divider"><span>past midnight</span></div>';
     }
     const cat = entryDotClass(entry);
     const clickAttr = entry.id ? ' onclick="openEntryDetail(\'' + selectedDate + '\',\'' + entry.id + '\')" style="cursor:pointer"' : '';
@@ -2168,6 +2210,90 @@ function importData() {
     return;
   }
 
+  // Support full-backup import (whole appData object as emitted by exportData)
+  if (data && typeof data === 'object' && !Array.isArray(data) &&
+      data.days && typeof data.days === 'object' && !Array.isArray(data.days)) {
+    let totalAdded = 0;
+    let dayCount = 0;
+    Object.keys(data.days).forEach(function(dateKey) {
+      const src = data.days[dateKey];
+      if (!src || typeof src !== 'object') return;
+      const dayCopy = Object.assign({}, src, { date: dateKey });
+      totalAdded += importSingleDay(dayCopy);
+      dayCount++;
+    });
+
+    // Merge top-level arrays (never replace, never drop existing)
+    if (Array.isArray(data.tasks)) {
+      if (!appData.tasks) appData.tasks = [];
+      data.tasks.forEach(function(t) {
+        if (!t) return;
+        let existing = null;
+        if (t.id) existing = appData.tasks.find(x => x.id === t.id);
+        if (!existing) existing = appData.tasks.find(x => x.text === t.text);
+        if (existing) { Object.assign(existing, t); if (!existing.id) existing.id = genId(); }
+        else { if (!t.id) t.id = genId(); appData.tasks.push(t); }
+      });
+    }
+    if (Array.isArray(data.dishes)) {
+      if (!appData.dishes) appData.dishes = [];
+      data.dishes.forEach(function(d) {
+        if (!d) return;
+        let existing = null;
+        if (d.id) existing = appData.dishes.find(x => x.id === d.id);
+        if (!existing) existing = appData.dishes.find(x => x.name === d.name);
+        if (existing) { Object.assign(existing, d); if (!existing.id) existing.id = genId(); }
+        else { if (!d.id) d.id = genId(); appData.dishes.push(d); }
+      });
+    }
+    if (Array.isArray(data.wishlist)) {
+      if (!appData.wishlist) appData.wishlist = [];
+      data.wishlist.forEach(function(w) {
+        if (!w) return;
+        let existing = null;
+        if (w.id) existing = appData.wishlist.find(x => x.id === w.id);
+        if (!existing) existing = appData.wishlist.find(x => x.text === w.text);
+        if (existing) { Object.assign(existing, w); if (!existing.id) existing.id = genId(); }
+        else { if (!w.id) w.id = genId(); appData.wishlist.push(w); }
+      });
+    }
+    if (Array.isArray(data.healthEntries)) {
+      if (!appData.healthEntries) appData.healthEntries = [];
+      data.healthEntries.forEach(function(h) {
+        if (!h) return;
+        let existing = null;
+        if (h.id) existing = appData.healthEntries.find(x => x.id === h.id);
+        if (!existing) existing = appData.healthEntries.find(x => x.description === h.description && x.date_noticed === h.date_noticed);
+        if (existing) { Object.assign(existing, h); if (!existing.id) existing.id = genId(); }
+        else { if (!h.id) h.id = genId(); appData.healthEntries.push(h); }
+      });
+    }
+    if (Array.isArray(data.dopamineHealthy)) {
+      if (!appData.dopamineHealthy) appData.dopamineHealthy = [];
+      data.dopamineHealthy.forEach(function(s) {
+        if (s && appData.dopamineHealthy.indexOf(s) === -1) appData.dopamineHealthy.push(s);
+      });
+    }
+    if (Array.isArray(data.dopamineRegret)) {
+      if (!appData.dopamineRegret) appData.dopamineRegret = [];
+      data.dopamineRegret.forEach(function(s) {
+        if (s && appData.dopamineRegret.indexOf(s) === -1) appData.dopamineRegret.push(s);
+      });
+    }
+    if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
+      if (!appData.settings) appData.settings = {};
+      Object.assign(appData.settings, data.settings);
+    }
+
+    saveData();
+    if (typeof applySettings === 'function') applySettings();
+    renderHome(); renderStats(); renderTasks(); renderHealth(); renderMoney();
+    if (typeof renderLists === 'function') renderLists();
+    statusEl.className = 'import-status success';
+    statusEl.textContent = 'Restored full backup: ' + dayCount + ' days, ' + totalAdded + ' new entries added.';
+    return;
+  }
+
   if (!data.date) {
     statusEl.className = 'import-status error';
     statusEl.textContent = 'Missing "date" field in JSON.';
@@ -2311,11 +2437,27 @@ function importSingleDay(data) {
 }
 
 function exportData() {
-  const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+  const now = new Date();
+  const pad = function(n) { return String(n).padStart(2, '0'); };
+  const yyyy = now.getFullYear();
+  const mm = pad(now.getMonth() + 1);
+  const dd = pad(now.getDate());
+  const hh = pad(now.getHours());
+  const mi = pad(now.getMinutes());
+  const ss = pad(now.getSeconds());
+  const offMin = -now.getTimezoneOffset();
+  const offSign = offMin >= 0 ? '+' : '-';
+  const offAbs = Math.abs(offMin);
+  const offHH = pad(Math.floor(offAbs / 60));
+  const offMM = pad(offAbs % 60);
+  const exportedAt = yyyy + '-' + mm + '-' + dd + 'T' + hh + ':' + mi + ':' + ss + offSign + offHH + ':' + offMM;
+
+  const payload = Object.assign({ exported_at: exportedAt }, appData);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'sanctuary-backup-' + todayStr() + '.json';
+  a.download = 'sanctuary-backup-' + yyyy + '-' + mm + '-' + dd + '-' + hh + mi + '.json';
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -2438,7 +2580,7 @@ function submitNewHealth() {
    ============================================ */
 /* ===== QUICK ADD + DETAIL (Paste B) ===== */
 let WATER_TARGET = 1200;
-let quickAddType = 'meal';
+let quickAddType = 'misc';
 let quickNutritionOpen = false;
 let detailContext = null;
 
@@ -2526,14 +2668,14 @@ function escapeAttr(str) {
 }
 
 function openQuickAdd() {
-  quickAddType = 'meal';
+  quickAddType = 'misc';
   quickNutritionOpen = false;
   document.getElementById('quickAddOverlay').classList.add('visible');
   document.getElementById('quickAddSheet').classList.add('visible');
   document.querySelectorAll('.qa-chip').forEach(c => c.classList.remove('active'));
-  const firstChip = document.querySelector('.qa-chip[data-type="meal"]');
+  const firstChip = document.querySelector('.qa-chip[data-type="misc"]');
   if (firstChip) firstChip.classList.add('active');
-  renderQuickFields('meal');
+  renderQuickFields('misc');
 }
 function closeQuickAdd() {
   document.getElementById('quickAddOverlay').classList.remove('visible');
@@ -3046,9 +3188,29 @@ function openSettings() {
   c.innerHTML =
     '<div class="sheet-field"><label class="sheet-label">Water target (ml)</label><input class="sheet-input" id="setWaterTarget" type="number" inputmode="numeric" value="' + WATER_TARGET + '"></div>' +
     '<button class="sheet-btn" onclick="saveSettings()">Save</button>' +
-    '<button class="sheet-btn secondary" onclick="closeSettings()">Cancel</button>';
+    '<button class="sheet-btn secondary" onclick="closeSettings()">Cancel</button>' +
+    '<div class="dz-section">' +
+    '<div class="dz-label">Danger zone</div>' +
+    '<div class="dz-note">Removes every day, task, meal, health note, expense, dish, and wish from this device. A backup will download first.</div>' +
+    '<button class="dz-btn" onclick="clearAllData()">Clear all data</button>' +
+    '</div>';
   document.getElementById('settingsOverlay').classList.add('visible');
   document.getElementById('settingsSheet').classList.add('visible');
+}
+
+function clearAllData() {
+  const first = confirm('Clear all Sanctuary data on this device?\n\nA full backup will download first so nothing is lost.');
+  if (!first) return;
+  exportData();
+  const second = confirm('Backup downloaded. Ready to wipe?\n\nSanctuary stores everything locally on this device only. There is no server copy. Once wiped, only the backup file you just downloaded can restore it.');
+  if (!second) return;
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  appData = {};
+  loadData();
+  applySettings();
+  closeSettings();
+  renderHome(); renderStats(); renderTasks(); renderHealth(); renderMoney();
+  if (typeof renderLists === 'function') renderLists();
 }
 function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('visible');
