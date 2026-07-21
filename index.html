@@ -1569,7 +1569,7 @@ function renderHome() {
   const dayData = appData.days[selectedDate] || {};
 
   // Water
-  const water = dayData.water_ml || 0;
+  const water = dayWaterMl(dayData);
   const waterEl = document.getElementById('homeWater');
   waterEl.textContent = water > 0 ? water : '--';
   document.getElementById('homeWaterSub').textContent = water > 0 ? ('of ' + WATER_TARGET + 'ml') : 'no data';
@@ -1708,7 +1708,7 @@ function renderDailySummary(dayData) {
     return;
   }
 
-  const water = dayData.water_ml || 0;
+  const water = dayWaterMl(dayData);
   let cal = 0;
   if (dayData.meals) dayData.meals.forEach(m => { cal += m.calories || 0; });
   const habits = (dayData.habits_completed || []).length;
@@ -1743,7 +1743,7 @@ function renderStats(period) {
 
   // Water bars
   renderMiniBars('statsWaterBars', dates, function(d) {
-    return (appData.days[d] && appData.days[d].water_ml) || 0;
+    return dayWaterMl(appData.days[d]);
   }, WATER_TARGET, 'var(--sky)', 'statsWaterAvg', 'ml avg');
 
   // Sleep bars (convert to hours)
@@ -2763,7 +2763,7 @@ function submitQuickAdd() {
     const day = ensureDay(dateKey);
     day.water_ml = (day.water_ml || 0) + amt;
     if (!day.entries) day.entries = [];
-    day.entries.push({ id: genId(), time: valOrEmpty('qaTime') || nowTime(), text: '+' + amt + 'ml water', category: 'other', tags: ['water'], note: valOrEmpty('qaNote') || null });
+    day.entries.push({ id: genId(), time: valOrEmpty('qaTime') || nowTime(), text: '+' + amt + 'ml water', category: 'other', tags: ['water'], note: valOrEmpty('qaNote') || null, ml: amt });
     saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
     return;
   }
@@ -2863,7 +2863,7 @@ function addWater(ml) {
   const day = ensureDay(dateKey);
   day.water_ml = (day.water_ml || 0) + ml;
   if (!day.entries) day.entries = [];
-  day.entries.push({ id: genId(), time: nowTime(), text: '+' + ml + 'ml water', category: 'other', tags: ['water'], note: null });
+  day.entries.push({ id: genId(), time: nowTime(), text: '+' + ml + 'ml water', category: 'other', tags: ['water'], note: null, ml: ml });
   saveData(); selectedDate = dateKey; renderHome(); renderStats();
 }
 
@@ -3266,6 +3266,26 @@ function entryDotClass(entry) {
   if (tags.indexOf('gym') !== -1) return 'gym';
   if (tags.indexOf('water') !== -1) return 'water';
   return entry.category || 'other';
+}
+
+function dayWaterMl(day) {
+  if (!day) return 0;
+  const entries = day.entries || [];
+  let sum = 0;
+  let count = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (entryDotClass(e) !== 'water') continue;
+    count++;
+    if (typeof e.ml === 'number' && !isNaN(e.ml)) {
+      sum += e.ml;
+      continue;
+    }
+    const m = (e.text || '').match(/\d+/);
+    if (m) sum += parseInt(m[0], 10);
+  }
+  if (count > 0) return sum;
+  return day.water_ml || 0;
 }
 
 /* ===== SCOPED EXPORT + CUSTOM RANGE (Paste E) ===== */
