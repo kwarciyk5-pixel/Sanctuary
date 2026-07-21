@@ -959,6 +959,7 @@ select.sheet-input { appearance: none; }
 .pm-divider span { display: inline-block; }
 .timeline-dot.gym { background: var(--mint-deep); }
 .timeline-dot.water { background: var(--sky-deep); }
+.timeline-dot.hubby { background: var(--rose-deep); }
 .task-cat-badge { background: var(--lavender-deep); }
 
 /* ============================================
@@ -1362,6 +1363,7 @@ select.sheet-input { appearance: none; }
     <button class="qa-chip" data-type="meal" onclick="selectQuickType('meal', this)">&#127860; Meal</button>
     <button class="qa-chip" data-type="water" onclick="selectQuickType('water', this)">&#128167; Water</button>
     <button class="qa-chip" data-type="day" onclick="selectQuickType('day', this)">&#128197; Day</button>
+    <button class="qa-chip" data-type="hubby" onclick="selectQuickType('hubby', this)">&#128149; Hubby</button>
     <button class="qa-chip" data-type="health" onclick="selectQuickType('health', this)">&#129657; Health</button>
     <button class="qa-chip" data-type="money" onclick="selectQuickType('money', this)">&#128176; Money</button>
   </div>
@@ -1712,7 +1714,7 @@ function renderDailySummary(dayData) {
   let cal = 0;
   if (dayData.meals) dayData.meals.forEach(m => { cal += m.calories || 0; });
   const habits = (dayData.habits_completed || []).length;
-  const hubby = dayData.hubby_time_minutes || 0;
+  const hubby = dayHubbyMinutes(dayData);
   const tasks = (dayData.tasks_completed || []).length;
 
   container.innerHTML =
@@ -1786,7 +1788,7 @@ function renderStats(period) {
 
   // Hubby bars
   renderMiniBars('statsHubbyBars', dates, function(d) {
-    return (appData.days[d] && appData.days[d].hubby_time_minutes) || 0;
+    return dayHubbyMinutes(appData.days[d]);
   }, 180, 'var(--rose)', 'statsHubbyAvg', 'min avg');
 
   // Habits rate
@@ -2745,6 +2747,14 @@ function renderQuickFields(type) {
   } else if (type === 'day') {
     c.innerHTML = '<div id="qaDayWrap"></div>';
     renderDayFields(todayStr());
+  } else if (type === 'hubby') {
+    c.innerHTML =
+      '<div class="sheet-field"><label class="sheet-label">Start</label><input class="sheet-input" id="qaStart" type="time" value=""></div>' +
+      '<div class="sheet-field"><label class="sheet-label">End</label><input class="sheet-input" id="qaEnd" type="time" value="' + t + '"></div>' +
+      dateRow + noteRow +
+      '<div class="sheet-label" style="font-size:12px;color:var(--text-muted);margin-top:-4px">Fill both times to log the session.</div>' +
+      '<button class="sheet-btn" onclick="submitQuickAdd()">Log Hubby Time</button>' +
+      '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
   } else {
     c.innerHTML =
       '<div class="sheet-field"><label class="sheet-label">What happened?</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Showered, called a friend"></div>' +
@@ -2784,6 +2794,28 @@ function submitQuickAdd() {
     if (!day.expenses) day.expenses = [];
     day.expenses.push({ id: genId(), description: desc, amount: amt, category: valOrEmpty('qaMoneyCat'), note: valOrEmpty('qaNote') || null });
     saveData(); renderMoney(); closeQuickAdd();
+    return;
+  }
+  if (type === 'hubby') {
+    const start = valOrEmpty('qaStart');
+    const end = valOrEmpty('qaEnd');
+    if (!start || !end) return;
+    const dateKey = valOrEmpty('qaDate') || todayStr();
+    const minutes = minutesBetween(start, end);
+    if (minutes <= 0) return;
+    const day = ensureDay(dateKey);
+    if (!day.entries) day.entries = [];
+    day.entries.push({
+      id: genId(),
+      time: start,
+      category: 'hubby',
+      start: start,
+      end: end,
+      minutes: minutes,
+      text: 'Hubby ' + start + '-' + end + ' (' + minutes + ' min)',
+      note: valOrEmpty('qaNote') || null
+    });
+    saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
     return;
   }
   if (type === 'day') {
@@ -2874,11 +2906,20 @@ function openEntryDetail(dateKey, id) {
   if (!entry) return;
   detailContext = { dateKey: dateKey, id: id };
   const meal = (day.meals || []).find(m => m.id === id);
+  const isHubby = entry.category === 'hubby';
   const c = document.getElementById('detailFields');
-  let html =
-    '<div class="sheet-field"><label class="sheet-label">Text</label><input class="sheet-input" id="dtText" value="' + escapeAttr(entry.text || '') + '"></div>' +
-    '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="dtTime" type="time" value="' + (entry.time || '') + '"></div>' +
-    '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
+  let html;
+  if (isHubby) {
+    html =
+      '<div class="sheet-field"><label class="sheet-label">Start</label><input class="sheet-input" id="dtStart" type="time" value="' + escapeAttr(entry.start || entry.time || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">End</label><input class="sheet-input" id="dtEnd" type="time" value="' + escapeAttr(entry.end || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
+  } else {
+    html =
+      '<div class="sheet-field"><label class="sheet-label">Text</label><input class="sheet-input" id="dtText" value="' + escapeAttr(entry.text || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="dtTime" type="time" value="' + (entry.time || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
+  }
   if (meal) {
     html +=
       '<div class="qa-section-label">Nutrition</div>' +
@@ -2908,6 +2949,21 @@ function saveEntryDetail() {
   if (!day) return;
   const entry = (day.entries || []).find(e => e.id === detailContext.id);
   if (!entry) return;
+  if (entry.category === 'hubby') {
+    const start = valOrEmpty('dtStart');
+    const end = valOrEmpty('dtEnd');
+    if (!start || !end) return;
+    const minutes = minutesBetween(start, end);
+    if (minutes <= 0) return;
+    entry.start = start;
+    entry.end = end;
+    entry.time = start;
+    entry.minutes = minutes;
+    entry.text = 'Hubby ' + start + '-' + end + ' (' + minutes + ' min)';
+    entry.note = valOrEmpty('dtNote') || null;
+    saveData(); renderHome(); renderStats(); closeDetail();
+    return;
+  }
   entry.text = valOrEmpty('dtText');
   entry.time = valOrEmpty('dtTime');
   entry.note = valOrEmpty('dtNote') || null;
@@ -3265,7 +3321,23 @@ function entryDotClass(entry) {
   const tags = entry.tags || [];
   if (tags.indexOf('gym') !== -1) return 'gym';
   if (tags.indexOf('water') !== -1) return 'water';
+  if (entry.category === 'hubby') return 'hubby';
   return entry.category || 'other';
+}
+
+function minutesBetween(start, end) {
+  if (!start || !end) return 0;
+  const s = String(start).split(':');
+  const e = String(end).split(':');
+  const sh = parseInt(s[0], 10);
+  const sm = parseInt(s[1], 10) || 0;
+  const eh = parseInt(e[0], 10);
+  const em = parseInt(e[1], 10) || 0;
+  if (isNaN(sh) || isNaN(eh)) return 0;
+  let startMin = sh * 60 + sm;
+  let endMin = eh * 60 + em;
+  if (endMin <= startMin) endMin += 1440;
+  return endMin - startMin;
 }
 
 function dayWaterMl(day) {
@@ -3286,6 +3358,25 @@ function dayWaterMl(day) {
   }
   if (count > 0) return sum;
   return day.water_ml || 0;
+}
+
+function dayHubbyMinutes(day) {
+  if (!day) return 0;
+  const entries = day.entries || [];
+  let sum = 0;
+  let count = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (entryDotClass(e) !== 'hubby') continue;
+    count++;
+    if (typeof e.minutes === 'number' && !isNaN(e.minutes)) {
+      sum += e.minutes;
+      continue;
+    }
+    sum += minutesBetween(e.start, e.end);
+  }
+  if (count > 0) return sum;
+  return day.hubby_time_minutes || 0;
 }
 
 /* ===== SCOPED EXPORT + CUSTOM RANGE (Paste E) ===== */
