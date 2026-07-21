@@ -2862,6 +2862,33 @@ function submitQuickAdd() {
     var prev = day.habits_completed || [];
     prev.forEach(function (h) { if (HABIT_LIST.indexOf(h) < 0 && doneList.indexOf(h) < 0) doneList.push(h); });
     day.habits_completed = doneList;
+    HABIT_LIST.forEach(function (h) {
+      var hid = 'habit-' + dateKey + '-' + h.replace(/\s+/g, '_');
+      var hidx = -1, hk;
+      for (hk = 0; hk < day.entries.length; hk++) { if (day.entries[hk].id === hid) { hidx = hk; break; } }
+      var checked = doneList.indexOf(h) >= 0;
+      if (checked) {
+        var hent = { id: hid, time: nowTime(), text: h, category: 'other', tags: ['habit'], note: null };
+        if (hidx >= 0) { hent.time = day.entries[hidx].time; day.entries[hidx] = hent; }
+        else { day.entries.push(hent); }
+      } else if (hidx >= 0) {
+        day.entries.splice(hidx, 1);
+      }
+    });
+    var sleepId = 'sleep-' + dateKey;
+    var sleepIdx = -1, sk;
+    for (sk = 0; sk < day.entries.length; sk++) { if (day.entries[sk].id === sleepId) { sleepIdx = sk; break; } }
+    var sleepText = null;
+    if (bed && wake) sleepText = 'Sleep ' + bed + '-' + wake;
+    else if (bed) sleepText = 'Sleep ' + bed;
+    else if (wake) sleepText = 'Woke ' + wake;
+    if (sleepText) {
+      var sent = { id: sleepId, time: bed || wake, text: sleepText, category: 'other', tags: ['sleep'], note: null };
+      if (sleepIdx >= 0) { if (!bed) sent.time = day.entries[sleepIdx].time; day.entries[sleepIdx] = sent; }
+      else { day.entries.push(sent); }
+    } else if (sleepIdx >= 0) {
+      day.entries.splice(sleepIdx, 1);
+    }
     saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
     return;
   }
