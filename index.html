@@ -1017,7 +1017,7 @@ select.sheet-input { appearance: none; }
 #quickAddSheet .sheet-input { box-sizing: border-box; max-width: 100%; min-width: 0; }
 
 /* Batch E: health timeline dot -- own colour, not gym/water/hubby */
-:root { --teal: #8ED4C8; }
+:root { --teal: #9D7CD8; }
 .timeline-dot.health { background: var(--teal); }
 </style>
 </head>
@@ -2809,7 +2809,7 @@ function submitQuickAdd() {
     var hent = { id: hid, time: nowTime(), text: desc, category: 'health', tags: ['health'], note: null };
     if (hidx >= 0) { hent.time = hday.entries[hidx].time; hday.entries[hidx] = hent; }
     else { hday.entries.push(hent); }
-    saveData(); selectedDate = dateKey; renderHealth(); renderHome(); closeQuickAdd();
+    saveData(); renderHealth(); renderHome(); closeQuickAdd();
     return;
   }
   if (type === 'money') {
