@@ -1010,6 +1010,15 @@ select.sheet-input { appearance: none; }
   border: 1.5px solid #f0b3b3;
 }
 .dz-btn:active { background: #ffd0d0; }
+
+/* Batch E: Quick Log field rows clamp to sheet width so it does not scroll sideways.
+   Chip row (.qa-chips) is deliberately not touched -- chips are meant to scroll. */
+#quickAddSheet .sheet-field { box-sizing: border-box; max-width: 100%; min-width: 0; }
+#quickAddSheet .sheet-input { box-sizing: border-box; max-width: 100%; min-width: 0; }
+
+/* Batch E: health timeline dot -- own colour, not gym/water/hubby */
+:root { --teal: #9D7CD8; }
+.timeline-dot.health { background: var(--teal); }
 </style>
 </head>
 <body>
@@ -2564,16 +2573,26 @@ function submitNewWish() {
 function submitNewHealth() {
   const desc = document.getElementById('newHealthDesc').value.trim();
   if (!desc) return;
+  const dateKey = todayStr();
+  var hid = Date.now().toString() + Math.random().toString(36).substr(2, 5);
   appData.healthEntries.push({
     description: desc,
     suspected_cause: document.getElementById('newHealthCause').value.trim() || null,
     category: document.getElementById('newHealthCat').value,
     status: document.getElementById('newHealthStatus').value,
-    date_noticed: todayStr(),
-    id: Date.now().toString() + Math.random().toString(36).substr(2, 5)
+    date_noticed: dateKey,
+    id: hid
   });
+  var hday = ensureDay(dateKey);
+  if (!hday.entries) hday.entries = [];
+  var hidx = -1, hk;
+  for (hk = 0; hk < hday.entries.length; hk++) { if (hday.entries[hk].id === hid) { hidx = hk; break; } }
+  var hent = { id: hid, time: nowTime(), text: desc, category: 'health', tags: ['health'], note: null };
+  if (hidx >= 0) { hent.time = hday.entries[hidx].time; hday.entries[hidx] = hent; }
+  else { hday.entries.push(hent); }
   saveData();
   renderHealth();
+  renderHome();
   closeAddSheet();
 }
 
@@ -2781,8 +2800,16 @@ function submitQuickAdd() {
     const desc = valOrEmpty('qaHealthDesc');
     if (!desc) return;
     const dateKey = valOrEmpty('qaDate') || todayStr();
-    appData.healthEntries.push({ description: desc, suspected_cause: valOrEmpty('qaHealthCause') || null, category: valOrEmpty('qaHealthCat'), status: valOrEmpty('qaHealthStatus'), date_noticed: dateKey, note: valOrEmpty('qaNote') || null, id: genId() });
-    saveData(); renderHealth(); closeQuickAdd();
+    var hid = genId();
+    appData.healthEntries.push({ description: desc, suspected_cause: valOrEmpty('qaHealthCause') || null, category: valOrEmpty('qaHealthCat'), status: valOrEmpty('qaHealthStatus'), date_noticed: dateKey, note: valOrEmpty('qaNote') || null, id: hid });
+    var hday = ensureDay(dateKey);
+    if (!hday.entries) hday.entries = [];
+    var hidx = -1, hk;
+    for (hk = 0; hk < hday.entries.length; hk++) { if (hday.entries[hk].id === hid) { hidx = hk; break; } }
+    var hent = { id: hid, time: nowTime(), text: desc, category: 'health', tags: ['health'], note: null };
+    if (hidx >= 0) { hent.time = hday.entries[hidx].time; hday.entries[hidx] = hent; }
+    else { hday.entries.push(hent); }
+    saveData(); renderHealth(); renderHome(); closeQuickAdd();
     return;
   }
   if (type === 'money') {
@@ -3349,6 +3376,7 @@ function entryDotClass(entry) {
   if (tags.indexOf('gym') !== -1) return 'gym';
   if (tags.indexOf('water') !== -1) return 'water';
   if (entry.category === 'hubby') return 'hubby';
+  if (tags.indexOf('health') !== -1) return 'health';
   return entry.category || 'other';
 }
 
