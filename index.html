@@ -1019,6 +1019,17 @@ select.sheet-input { appearance: none; }
 /* Batch E: health timeline dot -- own colour, not gym/water/hubby */
 :root { --teal: #9D7CD8; }
 .timeline-dot.health { background: var(--teal); }
+
+/* Batch F: Quick Log still scrolled sideways because .bottom-sheet has
+   overflow-y:auto with default overflow-x:visible, which the CSS
+   paired-values rule promotes to overflow-x:auto. Native
+   input[type=date|time] on WebKit assert an intrinsic min-content width
+   (value text plus picker chrome) that min-width:0 alone does not shrink
+   below, so the sheet itself scrolls right. .qa-chips has its own
+   overflow-x:auto, so a sheet-level clip does NOT break chip scrolling. */
+#quickAddSheet { overflow-x: hidden; }
+#quickAddSheet .sheet-field { overflow: hidden; }
+#quickAddSheet .sheet-input { display: block; width: 100%; box-sizing: border-box; max-width: 100%; min-width: 0; }
 </style>
 </head>
 <body>
