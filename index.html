@@ -547,6 +547,12 @@ input, textarea, select { font-family: var(--font); }
   flex-shrink: 0;
   margin-top: 7px;
 }
+.task-swipe-wrap { position: relative; overflow: hidden; border-radius: var(--radius-md); margin-bottom: 8px; }
+.task-swipe-wrap .task-item { margin-bottom: 0; will-change: transform; }
+.task-actions { position: absolute; top: 0; right: 0; bottom: 0; display: flex; align-items: stretch; }
+.task-act { border: none; width: 64px; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #fff; cursor: pointer; }
+.task-act.edit { background: var(--lavender); }
+.task-act.delete { background: var(--peach-deep); }
 .task-priority.high { background: var(--peach-deep); }
 .task-priority.medium { background: var(--yellow-deep); }
 
@@ -1199,6 +1205,7 @@ select.sheet-input { appearance: none; }
       <div class="task-categories" id="taskCategories">
         <button class="task-cat-pill active" onclick="filterTasks('all', this)">All</button>
         <button class="task-cat-pill" onclick="filterTasks('trading', this)">Trading</button>
+        <button class="task-cat-pill" onclick="filterTasks('work', this)">Work</button>
         <button class="task-cat-pill" onclick="filterTasks('home', this)">Home & Life</button>
         <button class="task-cat-pill" onclick="filterTasks('health', this)">Health</button>
         <button class="task-cat-pill" onclick="filterTasks('social', this)">Social</button>
@@ -1360,6 +1367,18 @@ select.sheet-input { appearance: none; }
   <div id="addSheetContent">
     <!-- Dynamic content based on active tab -->
   </div>
+</div>
+
+<div class="sheet-overlay" id="taskEditOverlay" onclick="closeTaskEdit()"></div>
+<div class="bottom-sheet" id="taskEditSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">&#9998; Edit Task</div>
+  <div class="sheet-field"><label class="sheet-label">Task</label><input class="sheet-input" id="editTaskText"></div>
+  <div class="sheet-field"><label class="sheet-label">Category</label><select class="sheet-input" id="editTaskCat"><option value="home">Home & Life</option><option value="work">Work</option><option value="trading">Trading</option><option value="health">Health</option><option value="social">Social</option><option value="groceries">Groceries</option></select></div>
+  <div class="sheet-field"><label class="sheet-label">Priority</label><select class="sheet-input" id="editTaskPriority"><option value="none">None</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+  <div class="sheet-field"><label class="sheet-label">Deadline (optional)</label><input class="sheet-input" id="editTaskDeadline" placeholder="e.g. Fri or 2026-08-10"></div>
+  <button class="sheet-btn" onclick="saveTaskEdit()">Save</button>
+  <button class="sheet-btn secondary" onclick="closeTaskEdit()">Cancel</button>
 </div>
 
 <!-- ===================== QUICK ADD SHEET ===================== -->
@@ -1642,8 +1661,8 @@ function renderCalendarStrip() {
   const todayDate = new Date(today + 'T00:00:00');
   const dayNames = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-  // Show 7 days back and 7 days forward
-  for (let i = -7; i <= 7; i++) {
+  // Show 60 days back and 7 days forward
+  for (let i = -60; i <= 7; i++) {
     const d = new Date(todayDate);
     d.setDate(d.getDate() + i);
     const dateStr = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -1658,15 +1677,20 @@ function renderCalendarStrip() {
     el.onclick = function() {
       selectedDate = dateStr;
       renderHome();
+      var _tca = document.querySelector('.tab-content-area');
+      if (_tca) _tca.scrollTop = 0;
     };
     strip.appendChild(el);
   }
 
-  // Scroll to center (today)
+  // Center today horizontally; preserve vertical scroll so date-taps land on the dashboard
   setTimeout(() => {
     const todayEl = strip.querySelector('.cal-day.today');
+    const _tca = document.querySelector('.tab-content-area');
     if (todayEl) {
-      todayEl.scrollIntoView({ inline: 'center', behavior: 'auto' });
+      const _saved = _tca ? _tca.scrollTop : 0;
+      todayEl.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+      if (_tca) _tca.scrollTop = _saved;
     }
   }, 50);
 }
@@ -1894,17 +1918,32 @@ function renderTasks() {
   });
 
   let html = '';
-  sorted.forEach((task, idx) => {
+  sorted.forEach((task) => {
     const realIdx = appData.tasks.indexOf(task);
-    html += '<div class="task-item' + (task.completed ? ' completed' : '') + '">';
-    html += '<div class="task-checkbox' + (task.completed ? ' checked' : '') + '" onclick="toggleTask(' + realIdx + ')"></div>';
-    html += '<div style="flex:1">';
-    html += '<div class="task-text">' + escapeHtml(task.text) + '</div>';
-    if (task.deadline) html += '<div class="task-meta">' + task.deadline + '</div>';
-    html += '</div>';
-    if (task.priority === 'high') html += '<div class="task-priority high"></div>';
-    else if (task.priority === 'medium') html += '<div class="task-priority medium"></div>';
-    html += '</div>';
+    if (task.completed) {
+      html += '<div class="task-item completed">';
+      html += '<div class="task-checkbox checked" onclick="toggleTask(' + realIdx + ')"></div>';
+      html += '<div style="flex:1"><div class="task-text">' + escapeHtml(task.text) + '</div>';
+      if (task.deadline) html += '<div class="task-meta">' + escapeHtml(task.deadline) + '</div>';
+      html += '</div>';
+      if (task.priority === 'high') html += '<div class="task-priority high"></div>';
+      else if (task.priority === 'medium') html += '<div class="task-priority medium"></div>';
+      html += '</div>';
+    } else {
+      html += '<div class="task-swipe-wrap">';
+      html += '<div class="task-actions">';
+      html += '<button class="task-act edit" onclick="openTaskEdit(' + realIdx + ')">&#9998;</button>';
+      html += '<button class="task-act delete" onclick="deleteTask(' + realIdx + ')">&#128465;</button>';
+      html += '</div>';
+      html += '<div class="task-item swipeable" ontouchstart="taskTouchStart(event,this)" ontouchmove="taskTouchMove(event)" ontouchend="taskTouchEnd(event)">';
+      html += '<div class="task-checkbox" onclick="toggleTask(' + realIdx + ')"></div>';
+      html += '<div style="flex:1"><div class="task-text">' + escapeHtml(task.text) + '</div>';
+      if (task.deadline) html += '<div class="task-meta">' + escapeHtml(task.deadline) + '</div>';
+      html += '</div>';
+      if (task.priority === 'high') html += '<div class="task-priority high"></div>';
+      else if (task.priority === 'medium') html += '<div class="task-priority medium"></div>';
+      html += '</div></div>';
+    }
   });
   container.innerHTML = html;
 
@@ -1912,6 +1951,89 @@ function renderTasks() {
   updateTaskBadges();
 }
 
+var TASK_ACTION_W = 128;
+var _tsw = { el: null, startX: 0, startTx: 0, tx: 0, moved: false, openEl: null };
+function taskTouchStart(e, el) {
+  if (_tsw.openEl && _tsw.openEl !== el) closeTaskSwipe();
+  _tsw.el = el;
+  _tsw.startX = e.touches[0].clientX;
+  _tsw.startTx = el.classList.contains('revealed') ? -TASK_ACTION_W : 0;
+  _tsw.tx = _tsw.startTx;
+  _tsw.moved = false;
+  el.style.transition = 'none';
+}
+function taskTouchMove(e) {
+  if (!_tsw.el) return;
+  var dx = e.touches[0].clientX - _tsw.startX;
+  if (Math.abs(dx) > 6) _tsw.moved = true;
+  var tx = _tsw.startTx + dx;
+  if (tx > 0) tx = 0;
+  if (tx < -TASK_ACTION_W) tx = -TASK_ACTION_W;
+  _tsw.tx = tx;
+  _tsw.el.style.transform = 'translateX(' + tx + 'px)';
+}
+function taskTouchEnd(e) {
+  if (!_tsw.el) return;
+  var el = _tsw.el;
+  el.style.transition = 'transform 0.2s ease';
+  if (_tsw.tx < -TASK_ACTION_W / 2) {
+    el.style.transform = 'translateX(-' + TASK_ACTION_W + 'px)';
+    el.classList.add('revealed');
+    _tsw.openEl = el;
+  } else {
+    el.style.transform = 'translateX(0)';
+    el.classList.remove('revealed');
+    if (_tsw.openEl === el) _tsw.openEl = null;
+  }
+  _tsw.el = null;
+}
+function closeTaskSwipe() {
+  var el = _tsw.openEl;
+  if (!el) return;
+  el.style.transition = 'transform 0.2s ease';
+  el.style.transform = 'translateX(0)';
+  el.classList.remove('revealed');
+  _tsw.openEl = null;
+}
+function deleteTask(idx) {
+  if (idx < 0 || idx >= appData.tasks.length) return;
+  appData.tasks.splice(idx, 1);
+  _tsw.openEl = null; _tsw.el = null;
+  saveData();
+  renderTasks();
+}
+var _editTaskIdx = null;
+function openTaskEdit(idx) {
+  if (idx < 0 || idx >= appData.tasks.length) return;
+  var t = appData.tasks[idx];
+  _editTaskIdx = idx;
+  document.getElementById('editTaskText').value = t.text || '';
+  document.getElementById('editTaskCat').value = t.category || 'home';
+  document.getElementById('editTaskPriority').value = t.priority || 'none';
+  document.getElementById('editTaskDeadline').value = t.deadline || '';
+  document.getElementById('taskEditOverlay').classList.add('visible');
+  document.getElementById('taskEditSheet').classList.add('visible');
+}
+function closeTaskEdit() {
+  document.getElementById('taskEditOverlay').classList.remove('visible');
+  document.getElementById('taskEditSheet').classList.remove('visible');
+  _editTaskIdx = null;
+}
+function saveTaskEdit() {
+  if (_editTaskIdx === null) return;
+  var t = appData.tasks[_editTaskIdx];
+  if (!t) { closeTaskEdit(); return; }
+  var txt = document.getElementById('editTaskText').value.trim();
+  if (!txt) return;
+  t.text = txt;
+  t.category = document.getElementById('editTaskCat').value;
+  t.priority = document.getElementById('editTaskPriority').value;
+  var dl = document.getElementById('editTaskDeadline').value.trim();
+  t.deadline = dl || null;
+  saveData();
+  closeTaskEdit();
+  renderTasks();
+}
 function toggleTask(idx) {
   appData.tasks[idx].completed = !appData.tasks[idx].completed;
   if (appData.tasks[idx].completed) {
@@ -2486,7 +2608,7 @@ function openAddSheet() {
     title.textContent = '\u2795 Add Task';
     content.innerHTML =
       '<div class="sheet-field"><label class="sheet-label">Task</label><input class="sheet-input" id="newTaskText" placeholder="What needs doing?"></div>' +
-      '<div class="sheet-field"><label class="sheet-label">Category</label><select class="sheet-input" id="newTaskCat"><option value="home">Home & Life</option><option value="trading">Trading</option><option value="health">Health</option><option value="social">Social</option><option value="groceries">Groceries</option></select></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Category</label><select class="sheet-input" id="newTaskCat"><option value="home">Home & Life</option><option value="work">Work</option><option value="trading">Trading</option><option value="health">Health</option><option value="social">Social</option><option value="groceries">Groceries</option></select></div>' +
       '<div class="sheet-field"><label class="sheet-label">Priority</label><select class="sheet-input" id="newTaskPriority"><option value="none">None</option><option value="medium">Medium</option><option value="high">High</option></select></div>' +
       '<button class="sheet-btn" onclick="submitNewTask()">Add Task</button>' +
       '<button class="sheet-btn secondary" onclick="closeAddSheet()">Cancel</button>';
@@ -2623,7 +2745,7 @@ var MED_PROTOCOL = [
   { key: 'yaz', name: 'Yaz', start: '2000-01-01', cycle: true },
   { key: 'mag', name: 'Magnesium citrate', start: '2026-07-19', cycle: false },
   { key: 'vitd', name: 'Vitamin D3 5000 IU', start: '2026-07-20', cycle: false },
-  { key: 'omega', name: 'Omega-3', start: '2026-07-24', cycle: false }
+  { key: 'omega', name: 'Omega-3', start: '2026-07-25', cycle: false }
 ];
 var YAZ_PACK_START = '2026-07-04';
 var YAZ_CYCLE_LEN = 28;
@@ -3703,11 +3825,8 @@ function renderHabitsGrid() {
   for (var k = 0; k < core.length; k++) {
     html += hgRowHtml(core[k], dateKeys, compact);
     if (core[k].type === 'medicine') {
-      html += '<div class="hg-toggle" onclick="hgToggleMed()">' + (HG_MED_OPEN ? 'hide items' : 'show items') + '</div>';
-      if (HG_MED_OPEN) {
-        var subs = hgMedSubRows(dateKeys);
-        for (var s = 0; s < subs.length; s++) html += hgRowHtml(subs[s], dateKeys, compact);
-      }
+      var subs = hgMedSubRows(dateKeys);
+      for (var s = 0; s < subs.length; s++) html += hgRowHtml(subs[s], dateKeys, compact);
     }
   }
 
