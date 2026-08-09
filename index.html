@@ -1128,8 +1128,8 @@ select.sheet-input { appearance: none; }
     <!-- =================== STATS TAB =================== -->
     <div class="tab-panel" id="tabStats">
       <div class="stats-period-filter">
-        <button class="period-btn active" onclick="setStatsPeriod('week', this)">Week</button>
-        <button class="period-btn" onclick="setStatsPeriod('month', this)">Month</button>
+        <button class="period-btn" onclick="setStatsPeriod('week', this)">Week</button>
+        <button class="period-btn active" onclick="setStatsPeriod('month', this)">Month</button>
         <button class="period-btn" onclick="setStatsPeriod('custom', this)">Custom</button>
       </div>
 
@@ -1840,11 +1840,15 @@ function renderStats(period) {
 function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSuffix, isPercent) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
-  let total = 0, count = 0;
+  let total = 0, count = 0, lo = null, hi = null;
 
   dates.forEach(d => {
     const val = valueFn(d);
-    if (val > 0) { total += val; count++; }
+    if (val > 0) {
+      total += val; count++;
+      if (lo === null || val < lo) lo = val;
+      if (hi === null || val > hi) hi = val;
+    }
     const pct = Math.min(val / maxVal * 100, 100);
     const bar = document.createElement('div');
     bar.className = 'mini-bar';
@@ -1855,10 +1859,13 @@ function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSu
 
   if (avgId) {
     const avg = count > 0 ? Math.round(total / count) : 0;
+    const avgEl = document.getElementById(avgId);
     if (isPercent) {
-      document.getElementById(avgId).textContent = count > 0 ? Math.round(count / dates.length * 100) + avgSuffix : '--';
+      avgEl.textContent = count > 0 ? Math.round(count / dates.length * 100) + avgSuffix : '--';
+    } else if (avg > 0) {
+      avgEl.innerHTML = avg + ' ' + avgSuffix + ' <span style="font-size:11px;color:var(--text-muted);font-weight:400">min ' + Math.round(lo) + ' \u00b7 max ' + Math.round(hi) + '</span>';
     } else {
-      document.getElementById(avgId).textContent = avg > 0 ? avg + ' ' + avgSuffix : '--';
+      avgEl.textContent = '--';
     }
   }
 }
@@ -3557,7 +3564,7 @@ function dayHubbyMinutes(day) {
 }
 
 /* ===== SCOPED EXPORT + CUSTOM RANGE (Paste E) ===== */
-let currentStatsPeriod = 'week';
+let currentStatsPeriod = 'month';
 let statsCustomRange = null;
 
 function fmtDateKey(d) {
