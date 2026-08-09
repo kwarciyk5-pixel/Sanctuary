@@ -1722,7 +1722,16 @@ function renderTimeline(dayData) {
     const clickAttr = entry.id ? ' onclick="openEntryDetail(\'' + selectedDate + '\',\'' + entry.id + '\')" style="cursor:pointer"' : '';
     html += '<div class="timeline-entry"' + clickAttr + '>';
     html += '<div class="timeline-dot ' + cat + '"></div>';
-    if (entry.time) html += '<div class="timeline-time">' + entry.time + '</div>';
+    if (entry.time) {
+      var tlabel = entry.time;
+      if (entry.end && (entry.category === 'meal' || entry.category === 'other')) {
+        tlabel = (entry.start || entry.time) + '\u2013' + entry.end;
+        if (entry.category === 'other' && typeof entry.minutes === 'number' && entry.minutes > 0) {
+          tlabel += ' (' + entry.minutes + ' min)';
+        }
+      }
+      html += '<div class="timeline-time">' + tlabel + '</div>';
+    }
     html += '<div class="timeline-text">' + escapeHtml(entry.text || '') + '</div>';
     if (entry.calories) html += '<div class="timeline-cal">~' + entry.calories + ' cal</div>';
     if (entry.tags && entry.tags.length > 0) {
@@ -2849,7 +2858,9 @@ function renderQuickFields(type) {
     c.innerHTML =
       '<div class="sheet-field"><label class="sheet-label">Meal</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Pad kaprao muu + rice"></div>' +
       '<div class="sheet-field"><label class="sheet-label">Meal type</label><select class="sheet-input" id="qaMealType"><option value="breakfast">Breakfast</option><option value="lunch" selected>Lunch</option><option value="dinner">Dinner</option><option value="supper">Supper</option><option value="snack">Snack</option></select></div>' +
-      timeRow + dateRow + noteRow +
+      '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="qaTime" type="time" value="' + t + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">End (optional)</label><input class="sheet-input" id="qaEnd" type="time" value=""></div>' +
+      dateRow + noteRow +
       '<div id="qaNutritionToggle" class="qa-expand" onclick="toggleNutrition()">+ add nutrition</div>' +
       '<div id="qaNutrition" style="display:none">' +
       '<div class="sheet-field"><label class="sheet-label">Calories</label><input class="sheet-input" id="qaCal" type="number" inputmode="numeric" placeholder="optional"></div>' +
@@ -2899,7 +2910,9 @@ function renderQuickFields(type) {
   } else {
     c.innerHTML =
       '<div class="sheet-field"><label class="sheet-label">What happened?</label><input class="sheet-input" id="qaDesc" placeholder="e.g. Showered, called a friend"></div>' +
-      timeRow + dateRow + noteRow +
+      '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="qaTime" type="time" value="' + t + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">End (optional)</label><input class="sheet-input" id="qaEnd" type="time" value=""></div>' +
+      dateRow + noteRow +
       '<button class="sheet-btn" onclick="submitQuickAdd()">Log</button>' +
       '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
   }
@@ -3046,14 +3059,16 @@ function submitQuickAdd() {
     if (!desc) return;
     const dateKey = valOrEmpty('qaDate') || todayStr();
     const time = valOrEmpty('qaTime') || nowTime();
+    const endT = valOrEmpty('qaEnd');
+    const mins = endT ? minutesBetween(time, endT) : null;
     const note = valOrEmpty('qaNote') || null;
     const day = ensureDay(dateKey);
     const sharedId = genId();
     const cal = numOrNull('qaCal');
     if (!day.entries) day.entries = [];
-    day.entries.push({ id: sharedId, time: time, text: desc, category: 'meal', tags: [], note: note, calories: cal });
+    day.entries.push({ id: sharedId, time: time, start: time, end: endT || null, minutes: mins, text: desc, category: 'meal', tags: [], note: note, calories: cal });
     if (!day.meals) day.meals = [];
-    day.meals.push({ id: sharedId, time: time, description: desc, meal_type: valOrEmpty('qaMealType'), calories: cal, protein_g: numOrNull('qaProtein'), carb_g: numOrNull('qaCarb'), fat_g: numOrNull('qaFat'), fiber_g: numOrNull('qaFiber'), sodium_mg: numOrNull('qaSodium'), source: valOrEmpty('qaSource'), note: note });
+    day.meals.push({ id: sharedId, time: time, start: time, end: endT || null, minutes: mins, description: desc, meal_type: valOrEmpty('qaMealType'), calories: cal, protein_g: numOrNull('qaProtein'), carb_g: numOrNull('qaCarb'), fat_g: numOrNull('qaFat'), fiber_g: numOrNull('qaFiber'), sodium_mg: numOrNull('qaSodium'), source: valOrEmpty('qaSource'), note: note });
     saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeQuickAdd();
     return;
   }
@@ -3061,8 +3076,11 @@ function submitQuickAdd() {
   if (!desc) return;
   const dateKey = valOrEmpty('qaDate') || todayStr();
   const day = ensureDay(dateKey);
+  const miscTime = valOrEmpty('qaTime') || nowTime();
+  const miscEnd = valOrEmpty('qaEnd');
+  const miscMins = miscEnd ? minutesBetween(miscTime, miscEnd) : null;
   if (!day.entries) day.entries = [];
-  day.entries.push({ id: genId(), time: valOrEmpty('qaTime') || nowTime(), text: desc, category: 'other', tags: [], note: valOrEmpty('qaNote') || null });
+  day.entries.push({ id: genId(), time: miscTime, start: miscTime, end: miscEnd || null, minutes: miscMins, text: desc, category: 'other', tags: [], note: valOrEmpty('qaNote') || null });
   saveData(); selectedDate = dateKey; renderHome(); closeQuickAdd();
 }
 
@@ -3083,12 +3101,19 @@ function openEntryDetail(dateKey, id) {
   detailContext = { dateKey: dateKey, id: id };
   const meal = (day.meals || []).find(m => m.id === id);
   const isHubby = entry.category === 'hubby';
+  const hasRange = (entry.category === 'meal' || entry.category === 'other');
   const c = document.getElementById('detailFields');
   let html;
   if (isHubby) {
     html =
       '<div class="sheet-field"><label class="sheet-label">Start</label><input class="sheet-input" id="dtStart" type="time" value="' + escapeAttr(entry.start || entry.time || '') + '"></div>' +
       '<div class="sheet-field"><label class="sheet-label">End</label><input class="sheet-input" id="dtEnd" type="time" value="' + escapeAttr(entry.end || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
+  } else if (hasRange) {
+    html =
+      '<div class="sheet-field"><label class="sheet-label">Text</label><input class="sheet-input" id="dtText" value="' + escapeAttr(entry.text || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="dtTime" type="time" value="' + (entry.start || entry.time || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">End (optional)</label><input class="sheet-input" id="dtEnd" type="time" value="' + escapeAttr(entry.end || '') + '"></div>' +
       '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
   } else {
     html =
@@ -3143,10 +3168,19 @@ function saveEntryDetail() {
   entry.text = valOrEmpty('dtText');
   entry.time = valOrEmpty('dtTime');
   entry.note = valOrEmpty('dtNote') || null;
+  const hasRange = (entry.category === 'meal' || entry.category === 'other');
+  if (hasRange) {
+    const endEl = document.getElementById('dtEnd');
+    const endV = endEl ? (endEl.value || '') : '';
+    entry.start = entry.time;
+    entry.end = endV || null;
+    entry.minutes = endV ? minutesBetween(entry.time, endV) : null;
+  }
   const meal = (day.meals || []).find(m => m.id === detailContext.id);
   if (meal) {
     meal.description = entry.text;
     meal.time = entry.time;
+    if (hasRange) { meal.start = entry.start; meal.end = entry.end; meal.minutes = entry.minutes; }
     meal.note = entry.note;
     meal.calories = numOrNull('dtCal');
     meal.protein_g = numOrNull('dtProtein');
