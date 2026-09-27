@@ -1543,6 +1543,7 @@ function updateLockDots() {
    ============================================ */
 function initApp() {
   loadData();
+  migrateMagGlycinate();
   applySettings();
   selectedDate = todayStr();
   renderHome();
@@ -2752,7 +2753,8 @@ function valOrEmpty(id) {
 }
 var MED_PROTOCOL = [
   { key: 'yaz', name: 'Yaz', start: '2000-01-01', cycle: true },
-  { key: 'mag', name: 'Magnesium citrate', start: '2026-07-19', cycle: false },
+  { key: 'mag', name: 'Magnesium citrate', start: '2026-07-19', end: '2026-09-20', cycle: false },
+  { key: 'mag2', name: 'Magnesium glycinate', start: '2026-09-21', cycle: false },
   { key: 'vitd', name: 'Vitamin D3 5000 IU', start: '2026-07-20', cycle: false },
   { key: 'omega', name: 'Omega-3', start: '2026-07-25', cycle: false }
 ];
@@ -2769,13 +2771,45 @@ function yazCycleDay(dateKey) {
   return d + 1;
 }
 
-function medActive(med, dateKey) { return dateKey >= med.start; }
+function medActive(med, dateKey) { return dateKey >= med.start && (!med.end || dateKey <= med.end); }
 
 function medRecord(day, name) {
   if (!day || !day.medicine) return null;
   var i;
   for (i = 0; i < day.medicine.length; i++) { if (day.medicine[i].name === name) return day.medicine[i]; }
   return null;
+}
+
+function migrateMagGlycinate() {
+  if (!appData || !appData.days) return;
+  var OLD = 'Magnesium citrate', NEW = 'Magnesium glycinate', FROM = '2026-09-21';
+  var changed = false;
+  Object.keys(appData.days).forEach(function (dk) {
+    if (dk < FROM) return;
+    var day = appData.days[dk];
+    if (!day) return;
+    if (day.medicine) {
+      var oldRec = medRecord(day, OLD);
+      if (oldRec) {
+        var newRec = medRecord(day, NEW);
+        if (!newRec) { oldRec.name = NEW; }
+        else { if (oldRec.taken) newRec.taken = true; day.medicine.splice(day.medicine.indexOf(oldRec), 1); }
+        changed = true;
+      }
+    }
+    if (day.entries) {
+      var oid = 'med-' + dk + '-mag', nid = 'med-' + dk + '-mag2';
+      var hasNew = day.entries.some(function (e) { return e && e.id === nid; });
+      for (var i = day.entries.length - 1; i >= 0; i--) {
+        var e = day.entries[i];
+        if (!e || e.id !== oid) continue;
+        if (hasNew) { day.entries.splice(i, 1); }
+        else { e.id = nid; e.text = 'Took ' + NEW; hasNew = true; }
+        changed = true;
+      }
+    }
+  });
+  if (changed) saveData();
 }
 
 function renderDayFields(dateKey) {
@@ -3781,7 +3815,7 @@ function hgActiveMeds(dateKey) {
   for (var i = 0; i < MED_PROTOCOL.length; i++) {
     var med = MED_PROTOCOL[i];
     if (!med) continue;
-    if (!med.start || dateKey >= med.start) out.push(med);
+    if ((!med.start || dateKey >= med.start) && (!med.end || dateKey <= med.end)) out.push(med);
   }
   return out;
 }
@@ -3808,6 +3842,7 @@ function hgCellState(row, dateKey) {
   if (row.type === 'medicine') return hgMedicineState(dateKey);
   if (row.type === 'med_item') {
     if (row.start && dateKey < row.start) return 'na';
+    if (row.end && dateKey > row.end) return 'na';
     var r = hgMedRow(day, row.name);
     return (r && r.taken) ? 'done' : 'none';
   }
@@ -3842,7 +3877,8 @@ function hgMedSubRows(dateKeys) {
     var med = MED_PROTOCOL[i];
     if (!med) continue;
     if (med.start && last && last < med.start) continue;
-    out.push({ label: '\u00b7 ' + med.name, type: 'med_item', name: med.name, start: med.start || '' });
+    if (med.end && dateKeys.length && dateKeys[0] > med.end) continue;
+    out.push({ label: '\u00b7 ' + med.name, type: 'med_item', name: med.name, start: med.start || '', end: med.end || '' });
   }
   return out;
 }
