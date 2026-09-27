@@ -1,5 +1,17 @@
 # Sanctuary — Project Notes
 
+## Current workflow (28-Sep-2026) — overrides anything below that disagrees
+
+- Claude Code runs in a cloud session started from Iris's phone, not on the Mac. `node` is available — use `node --check`. The Mac paths and the "no node" note further down are from June 2026 and no longer apply.
+- Changes arrive as paste blocks with exact FIND/REPLACE anchors. Each FIND must match exactly once; if 0 or 2+, stop and report without editing. Never use line numbers as anchors.
+- Before editing, confirm HEAD vs origin/main and print the SHA.
+- Work on a branch. After all checks pass, push the branch, fast-forward `main` to it, and report the new `main` SHA. This replaces "commit and push automatically" below.
+- Checks every time: 0 curly quotes in index.html; extract the `<script>` and `node --check` it; `node --check sw.js`; plus any simulation the paste block asks for.
+- When index.html changes ship, bump `CACHE_NAME` in sw.js so phones pick up the new version.
+- "RECON ONLY" means edit, commit and push nothing — report only.
+- The gym code is frozen; don't touch it unless a paste block says so.
+- Project documentation (instructions, code map, training reference) lives in Iris's Claude project, not in this repo. Don't add personal or health information to this repo.
+
 Personal daily-tracker PWA. Single HTML file with embedded CSS + JS, stored in localStorage. No build step, no framework, no dependencies. Served from GitHub Pages.
 
 ## User context
