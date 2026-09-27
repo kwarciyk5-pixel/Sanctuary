@@ -1685,7 +1685,7 @@ function renderCalendarStrip() {
 
   // Center today horizontally; preserve vertical scroll so date-taps land on the dashboard
   setTimeout(() => {
-    const todayEl = strip.querySelector('.cal-day.today');
+    const todayEl = strip.querySelector('.cal-day.selected') || strip.querySelector('.cal-day.today');
     const _tca = document.querySelector('.tab-content-area');
     if (todayEl) {
       const _saved = _tca ? _tca.scrollTop : 0;
@@ -3121,6 +3121,11 @@ function openEntryDetail(dateKey, id) {
       '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="dtTime" type="time" value="' + (entry.time || '') + '"></div>' +
       '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
   }
+  const _tags = entry.tags || [];
+  const _locked = entry.category === 'health' || ['medicine', 'habit', 'sleep', 'gym'].some(t => _tags.indexOf(t) >= 0);
+  if (!_locked) {
+    html = '<div class="sheet-field"><label class="sheet-label">Date</label><input class="sheet-input" id="dtDate" type="date" value="' + escapeAttr(dateKey) + '"></div>' + html;
+  }
   if (meal) {
     html +=
       '<div class="qa-section-label">Nutrition</div>' +
@@ -3144,6 +3149,33 @@ function closeDetail() {
   document.getElementById('detailSheet').classList.remove('visible');
   detailContext = null;
 }
+function moveDetailEntryDate() {
+  const oldKey = detailContext.dateKey;
+  const el = document.getElementById('dtDate');
+  if (!el || !el.value || el.value === oldKey || !/^\d{4}-\d{2}-\d{2}$/.test(el.value)) return oldKey;
+  const newKey = el.value;
+  const src = appData.days[oldKey];
+  if (!src || !src.entries) return oldKey;
+  const id = detailContext.id;
+  const eIdx = src.entries.findIndex(e => e.id === id);
+  if (eIdx < 0) return oldKey;
+  const dst = ensureDay(newKey);
+  if (!dst.entries) dst.entries = [];
+  const moved = src.entries.splice(eIdx, 1)[0];
+  dst.entries.push(moved);
+  if (src.meals) {
+    const mIdx = src.meals.findIndex(m => m.id === id);
+    if (mIdx >= 0) {
+      if (!dst.meals) dst.meals = [];
+      dst.meals.push(src.meals.splice(mIdx, 1)[0]);
+    }
+  }
+  if (moved.ml && (moved.tags || []).indexOf('water') >= 0) {
+    src.water_ml = Math.max(0, (src.water_ml || 0) - moved.ml);
+    dst.water_ml = (dst.water_ml || 0) + moved.ml;
+  }
+  return newKey;
+}
 function saveEntryDetail() {
   if (!detailContext) return;
   const day = appData.days[detailContext.dateKey];
@@ -3162,6 +3194,7 @@ function saveEntryDetail() {
     entry.minutes = minutes;
     entry.text = 'Hubby ' + start + '-' + end + ' (' + minutes + ' min)';
     entry.note = valOrEmpty('dtNote') || null;
+    selectedDate = moveDetailEntryDate();
     saveData(); renderHome(); renderStats(); closeDetail();
     return;
   }
@@ -3190,6 +3223,7 @@ function saveEntryDetail() {
     meal.sodium_mg = numOrNull('dtSodium');
     entry.calories = meal.calories;
   }
+  selectedDate = moveDetailEntryDate();
   saveData(); renderHome(); renderStats(); closeDetail();
 }
 function deleteEntryDetail() {
