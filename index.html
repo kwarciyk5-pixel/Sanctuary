@@ -877,6 +877,20 @@ select.sheet-input { appearance: none; }
   transition: transform 0.15s ease;
 }
 .qa-water-btn:active { transform: scale(0.94); }
+.qa-meal-btn { display: block; width: 100%; margin: -6px 0 12px; color: var(--lavender-deep); }
+.mp-row { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 12px; border-radius: var(--radius-md); background: var(--bg); margin-bottom: 8px; border: 1.5px solid transparent; }
+.mp-row.on { border-color: var(--lavender-deep); background: var(--bg-card); }
+.mp-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; cursor: pointer; min-height: 40px; }
+.mp-box { width: 22px; height: 22px; flex: none; border-radius: 7px; border: 2px solid var(--lavender-deep); display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 700; }
+.mp-row.on .mp-box { background: var(--lavender-deep); }
+.mp-name { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.mp-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.mp-qty { display: flex; align-items: center; gap: 4px; }
+.mp-qty button { width: 32px; height: 32px; border-radius: 10px; background: var(--bg); font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.mp-count { min-width: 24px; text-align: center; font-size: 13px; font-weight: 700; }
+.mp-edit { width: 40px; height: 40px; border-radius: 10px; background: transparent; color: var(--text-secondary); font-size: 16px; flex: none; }
+#dishEditOverlay, #dishIOOverlay { z-index: 210; }
+#dishEditSheet, #dishIOSheet { z-index: 211; }
 .qa-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scrollbar-width: none; }
 .qa-chips::-webkit-scrollbar { display: none; }
 .qa-chip {
@@ -1079,8 +1093,9 @@ select.sheet-input { appearance: none; }
 
       <div class="quick-add-bar">
         <button class="qa-log-btn" onclick="openQuickAdd()">&#10133; Log something</button>
-        <button class="qa-water-btn" onclick="addWater(250)">&#128167; +250ml</button>
+        <button class="qa-water-btn" onclick="addWater(200)">&#128167; +200ml</button>
       </div>
+      <button class="qa-water-btn qa-meal-btn" onclick="openMealPick()">&#127860; Log meal</button>
       <button class="gym-today-btn" onclick="openGym()">&#127947; Today's Session</button>
 
       <div class="stat-grid">
@@ -1359,6 +1374,26 @@ select.sheet-input { appearance: none; }
   <button class="sheet-btn secondary" onclick="closeImportSheet()">Cancel</button>
 </div>
 
+<!-- ===================== LOG MEAL SHEETS ===================== -->
+<div class="sheet-overlay" id="mealPickOverlay" onclick="closeMealPick()"></div>
+<div class="bottom-sheet" id="mealPickSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">&#127860; Log meal</div>
+  <div id="mealPickBody"></div>
+</div>
+<div class="sheet-overlay" id="dishEditOverlay" onclick="closeDishEdit()"></div>
+<div class="bottom-sheet" id="dishEditSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="dishEditTitle">&#9998; Edit meal</div>
+  <div id="dishEditBody"></div>
+</div>
+<div class="sheet-overlay" id="dishIOOverlay" onclick="closeDishIO()"></div>
+<div class="bottom-sheet" id="dishIOSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">&#128229; My meals list</div>
+  <div id="dishIOBody"></div>
+</div>
+
 <!-- ===================== ADD TASK SHEET ===================== -->
 <div class="sheet-overlay" id="addTaskOverlay" onclick="closeAddSheet()"></div>
 <div class="bottom-sheet" id="addTaskSheet">
@@ -1623,8 +1658,13 @@ function renderHome() {
 
   // Sleep
   if (dayData.sleep && dayData.sleep.bedtime) {
-    document.getElementById('homeSleep').textContent = dayData.sleep.bedtime;
-    document.getElementById('homeSleepSub').textContent = dayData.sleep.waketime ? 'woke ' + dayData.sleep.waketime : '';
+    if (dayData.sleep.waketime) {
+      document.getElementById('homeSleep').textContent = fmtHM(calcSleepMinutes(dayData.sleep.bedtime, dayData.sleep.waketime));
+      document.getElementById('homeSleepSub').textContent = dayData.sleep.bedtime + '–' + dayData.sleep.waketime;
+    } else {
+      document.getElementById('homeSleep').textContent = dayData.sleep.bedtime;
+      document.getElementById('homeSleepSub').textContent = 'bedtime';
+    }
   } else {
     document.getElementById('homeSleep').textContent = '--';
     document.getElementById('homeSleepSub').textContent = 'no data';
@@ -1731,9 +1771,13 @@ function renderTimeline(dayData) {
           tlabel += ' (' + entry.minutes + ' min)';
         }
       }
+      if (entry.tags && entry.tags.indexOf('sleep') >= 0 && dayData.sleep && dayData.sleep.bedtime && dayData.sleep.waketime) {
+        tlabel += ' (' + fmtHM(calcSleepMinutes(dayData.sleep.bedtime, dayData.sleep.waketime)) + ')';
+      }
       html += '<div class="timeline-time">' + tlabel + '</div>';
     }
-    html += '<div class="timeline-text">' + escapeHtml(entry.text || '') + '</div>';
+    const shownText = (entry.tags && entry.tags.indexOf('habit') >= 0) ? habitLabel(entry.text || '') : (entry.text || '');
+    html += '<div class="timeline-text">' + escapeHtml(shownText) + '</div>';
     if (entry.calories) html += '<div class="timeline-cal">~' + entry.calories + ' cal</div>';
     if (entry.tags && entry.tags.length > 0) {
       html += '<div class="timeline-tags">';
@@ -1795,8 +1839,8 @@ function renderStats(period) {
   renderMiniBars('statsSleepBars', dates, function(d) {
     const day = appData.days[d];
     if (!day || !day.sleep || !day.sleep.bedtime || !day.sleep.waketime) return 0;
-    return calcSleepHours(day.sleep.bedtime, day.sleep.waketime);
-  }, 10, 'var(--lavender)', 'statsSleepAvg', 'h avg');
+    return calcSleepMinutes(day.sleep.bedtime, day.sleep.waketime) / 60;
+  }, 10, 'var(--lavender)', 'statsSleepAvg', 'avg', false, function (h) { return fmtHM(h * 60); });
 
   // Calories bars
   renderMiniBars('statsCalBars', dates, function(d) {
@@ -1847,7 +1891,7 @@ function renderStats(period) {
   renderHabitsGrid();
 }
 
-function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSuffix, isPercent) {
+function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSuffix, isPercent, avgFormat) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
   let total = 0, count = 0;
@@ -1868,7 +1912,11 @@ function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSu
     if (isPercent) {
       document.getElementById(avgId).textContent = count > 0 ? Math.round(count / dates.length * 100) + avgSuffix : '--';
     } else {
-      document.getElementById(avgId).textContent = avg > 0 ? avg + ' ' + avgSuffix : '--';
+      if (avgFormat) {
+        document.getElementById(avgId).textContent = count > 0 ? avgFormat(total / count) + ' ' + avgSuffix : '--';
+      } else {
+        document.getElementById(avgId).textContent = avg > 0 ? avg + ' ' + avgSuffix : '--';
+      }
     }
   }
 }
@@ -1906,6 +1954,22 @@ function calcSleepHours(bedtime, waketime) {
   let wakeMin = wh * 60 + wm;
   if (wakeMin <= bedMin) wakeMin += 1440;
   return Math.round((wakeMin - bedMin) / 60 * 10) / 10;
+}
+
+function calcSleepMinutes(bedtime, waketime) {
+  const [bh, bm] = String(bedtime).split(':').map(Number);
+  const [wh, wm] = String(waketime).split(':').map(Number);
+  if ([bh, bm, wh, wm].some(isNaN)) return 0;
+  let bedMin = bh * 60 + bm;
+  let wakeMin = wh * 60 + wm;
+  if (wakeMin <= bedMin) wakeMin += 1440;
+  return wakeMin - bedMin;
+}
+
+function fmtHM(mins) {
+  mins = Math.round(mins);
+  if (!(mins > 0)) return '--';
+  return Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
 }
 
 /* ============================================
@@ -2118,6 +2182,7 @@ function renderLists() {
 }
 
 function renderDishes() {
+  ensureDishIds();
   const container = document.getElementById('dishList');
   const dishes = appData.dishes || [];
   if (dishes.length === 0) {
@@ -2127,7 +2192,7 @@ function renderDishes() {
 
   let html = '';
   dishes.forEach(dish => {
-    html += '<div class="dish-card">';
+    html += '<div class="dish-card" data-id="' + escapeAttr(dish.id || '') + '" onclick="if (this.dataset.id) openDishEdit(this.dataset.id)" style="cursor:pointer">';
     html += '<div class="dish-emoji">' + (dish.emoji || '&#127835;') + '</div>';
     html += '<div class="dish-info">';
     html += '<div class="dish-name">' + escapeHtml(dish.name) + '</div>';
@@ -2434,6 +2499,16 @@ function importData() {
     if (typeof renderLists === 'function') renderLists();
     statusEl.className = 'import-status success';
     statusEl.textContent = 'Restored full backup: ' + dayCount + ' days, ' + totalAdded + ' new entries added.';
+    return;
+  }
+
+  // Meals-list-only import: {"dishes": [...]} -- adds and updates, never removes
+  if (data && Array.isArray(data.dishes) && !data.date && !data.days) {
+    const res = dishMergeList(data.dishes);
+    saveData();
+    renderDishes();
+    statusEl.className = 'import-status success';
+    statusEl.textContent = 'Meals list: ' + res.added + ' added, ' + res.updated + ' updated, ' + res.same + ' unchanged. Nothing removed.';
     return;
   }
 
@@ -2761,6 +2836,12 @@ var MED_PROTOCOL = [
 var YAZ_PACK_START = '2026-09-28'; // current pack: first tab taken just after midnight on 28 Sep (log day 27 Sep). Re-anchored 28-Sep-2026; the old 4 Jul anchor had drifted.
 var YAZ_CYCLE_LEN = 28;
 var HABIT_LIST = ['Buddha offerings', 'Make bed', 'Tooth brush', 'Shower', 'Retinol', 'Prayers', 'Clean home', 'Iron'];
+// Display-only renames. Saved data keeps the original names so old days still count.
+function habitLabel(name) {
+  if (name === 'Tooth brush') return 'Brush teeth';
+  if (name === 'Shower') return 'Hair-wash';
+  return name;
+}
 
 function yazCycleDay(dateKey) {
   var a = new Date(YAZ_PACK_START + 'T00:00:00');
@@ -2832,7 +2913,7 @@ function renderDayFields(dateKey) {
   var habitRows = '';
   HABIT_LIST.forEach(function (h, i) {
     var ck = done.indexOf(h) >= 0 ? ' checked' : '';
-    habitRows += '<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:15px"><input type="checkbox" id="qaHabit_' + i + '"' + ck + ' style="width:20px;height:20px;flex:none"><span>' + h + '</span></label>';
+    habitRows += '<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:15px"><input type="checkbox" id="qaHabit_' + i + '"' + ck + ' style="width:20px;height:20px;flex:none"><span>' + habitLabel(h) + '</span></label>';
   });
   wrap.innerHTML =
     '<div class="sheet-field"><label class="sheet-label">Date</label><input class="sheet-input" id="qaDate" type="date" value="' + dateKey + '" onchange="renderDayFields(this.value)"></div>' +
@@ -2909,7 +2990,7 @@ function renderQuickFields(type) {
       '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
   } else if (type === 'water') {
     c.innerHTML =
-      '<div class="sheet-field"><label class="sheet-label">Amount (ml)</label><input class="sheet-input" id="qaWater" type="number" inputmode="numeric" value="250"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Amount (ml)</label><input class="sheet-input" id="qaWater" type="number" inputmode="numeric" value="200"></div>' +
       timeRow + dateRow + noteRow +
       '<button class="sheet-btn" onclick="submitQuickAdd()">Log Water</button>' +
       '<button class="sheet-btn secondary" onclick="closeQuickAdd()">Cancel</button>';
@@ -3771,6 +3852,400 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(function() {});
 }
 
+/* ===== LOG MEAL: pick from my meals list ===== */
+var mealPickSel = {};
+var mealPickQuery = '';
+var dishEditId = null;
+var dishIOPending = null;
+var DISH_NUM_KEYS = ['calories', 'protein_g', 'carb_g', 'fat_g', 'fiber_g', 'sodium_mg'];
+
+function ensureDishIds() {
+  if (!appData.dishes) appData.dishes = [];
+  var changed = false;
+  appData.dishes.forEach(function (d) { if (d && !d.id) { d.id = genId(); changed = true; } });
+  if (changed) saveData();
+}
+
+function dishById(id) {
+  return (appData.dishes || []).find(function (x) { return x && x.id === id; }) || null;
+}
+
+function dishNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  var n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+function mealTypeGuess(t) {
+  var h = parseInt(String(t || '').split(':')[0], 10);
+  if (isNaN(h)) return 'lunch';
+  if (h >= 5 && h < 11) return 'breakfast';
+  if (h >= 11 && h < 16) return 'lunch';
+  if (h >= 16 && h < 21) return 'dinner';
+  return 'supper';
+}
+
+function openMealPick() {
+  ensureDishIds();
+  mealPickSel = {};
+  mealPickQuery = '';
+  var t = nowTime();
+  var g = mealTypeGuess(t);
+  var opts = ['breakfast', 'lunch', 'dinner', 'supper', 'snack'].map(function (x) {
+    return '<option value="' + x + '"' + (x === g ? ' selected' : '') + '>' + x.charAt(0).toUpperCase() + x.slice(1) + '</option>';
+  }).join('');
+  document.getElementById('mealPickBody').innerHTML =
+    '<div style="display:flex;gap:8px">' +
+      '<div class="sheet-field" style="flex:1"><label class="sheet-label">Date</label><input class="sheet-input" id="mpDate" type="date" value="' + todayStr() + '"></div>' +
+      '<div class="sheet-field" style="flex:1"><label class="sheet-label">Time</label><input class="sheet-input" id="mpTime" type="time" value="' + t + '"></div>' +
+    '</div>' +
+    '<div class="sheet-field"><label class="sheet-label">Meal type</label><select class="sheet-input" id="mpType">' + opts + '</select></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Search my meals</label><input class="sheet-input" id="mpSearch" placeholder="type to filter" oninput="mealPickQuery = this.value; renderMealPickList()"></div>' +
+    '<div id="mpList"></div>' +
+    '<button class="sheet-btn secondary" onclick="openDishEdit(null)">&#10133; Add a meal to my list</button>' +
+    '<button class="sheet-btn secondary" onclick="openDishIO()">&#128229; Import / export my list</button>' +
+    '<div class="import-status" id="mpStatus"></div>' +
+    '<button class="sheet-btn" id="mpLogBtn" onclick="submitMealPick()">Log</button>' +
+    '<button class="sheet-btn secondary" onclick="closeMealPick()">Cancel</button>';
+  renderMealPickList();
+  document.getElementById('mealPickOverlay').classList.add('visible');
+  document.getElementById('mealPickSheet').classList.add('visible');
+}
+
+function closeMealPick() {
+  document.getElementById('mealPickOverlay').classList.remove('visible');
+  document.getElementById('mealPickSheet').classList.remove('visible');
+}
+
+function dishMetaLine(d) {
+  var parts = [];
+  if (d.portion) parts.push(escapeHtml(d.portion));
+  if (dishNum(d.calories)) parts.push('~' + dishNum(d.calories) + ' cal');
+  if (dishNum(d.protein_g)) parts.push(dishNum(d.protein_g) + 'g protein');
+  return parts.join(' · ');
+}
+
+function renderMealPickList() {
+  var el = document.getElementById('mpList');
+  if (!el) return;
+  var q = String(mealPickQuery || '').trim().toLowerCase();
+  var list = (appData.dishes || []).filter(function (d) {
+    return d && d.name && (!q || String(d.name).toLowerCase().indexOf(q) >= 0);
+  });
+  list.sort(function (a, b) {
+    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div>' + (q ? 'No meals match that.' : 'Your list is empty. Add a meal or import a list.') + '</div></div>';
+  } else {
+    var html = '';
+    list.forEach(function (d) {
+      var qn = mealPickSel[d.id] || 0;
+      var did = escapeAttr(d.id);
+      var meta = dishMetaLine(d);
+      html += '<div class="mp-row' + (qn ? ' on' : '') + '">';
+      html += '<div class="mp-main" data-id="' + did + '" onclick="mpToggle(this.dataset.id)">';
+      html += '<div class="mp-box">' + (qn ? '&#10003;' : '') + '</div>';
+      html += '<div style="min-width:0"><div class="mp-name">' + (d.pinned ? '&#128204; ' : '') + escapeHtml(d.name) + '</div>';
+      if (meta) html += '<div class="mp-meta">' + meta + '</div>';
+      html += '</div></div>';
+      if (qn) {
+        html += '<div class="mp-qty"><button aria-label="Less" data-id="' + did + '" onclick="mpStep(this.dataset.id, -1)">&minus;</button>' +
+          '<span class="mp-count">&times;' + qn + '</span>' +
+          '<button aria-label="More" data-id="' + did + '" onclick="mpStep(this.dataset.id, 1)">+</button></div>';
+      }
+      html += '<button class="mp-edit" aria-label="Edit ' + escapeAttr(d.name) + '" data-id="' + did + '" onclick="openDishEdit(this.dataset.id)">&#9998;</button>';
+      html += '</div>';
+    });
+    el.innerHTML = html;
+  }
+  var n = 0;
+  Object.keys(mealPickSel).forEach(function (k) { n += mealPickSel[k]; });
+  var btn = document.getElementById('mpLogBtn');
+  if (btn) btn.textContent = n ? 'Log ' + n + (n === 1 ? ' item' : ' items') : 'Log';
+}
+
+function mpToggle(id) {
+  if (mealPickSel[id]) delete mealPickSel[id];
+  else mealPickSel[id] = 1;
+  renderMealPickList();
+}
+
+function mpStep(id, delta) {
+  var n = (mealPickSel[id] || 0) + delta;
+  if (n <= 0) delete mealPickSel[id];
+  else mealPickSel[id] = n;
+  renderMealPickList();
+}
+
+function submitMealPick() {
+  var ids = Object.keys(mealPickSel);
+  var status = document.getElementById('mpStatus');
+  if (!ids.length) {
+    status.className = 'import-status error';
+    status.textContent = 'Tap a meal to pick it first.';
+    return;
+  }
+  var dateKey = valOrEmpty('mpDate') || todayStr();
+  var time = valOrEmpty('mpTime') || nowTime();
+  var mtype = valOrEmpty('mpType');
+  var day = ensureDay(dateKey);
+  if (!day.entries) day.entries = [];
+  if (!day.meals) day.meals = [];
+  function mul(v, q) { var n = dishNum(v); return n === null ? null : Math.round(n * q * 10) / 10; }
+  ids.forEach(function (id) {
+    var d = dishById(id);
+    if (!d) return;
+    var q = mealPickSel[id];
+    var desc = d.name + (q > 1 ? ' x' + q : '');
+    var cal = mul(d.calories, q);
+    var sid = genId();
+    day.entries.push({ id: sid, time: time, start: time, end: null, minutes: null, text: desc, category: 'meal', tags: [], note: null, calories: cal });
+    day.meals.push({ id: sid, time: time, start: time, end: null, minutes: null, description: desc, meal_type: mtype, calories: cal, protein_g: mul(d.protein_g, q), carb_g: mul(d.carb_g, q), fat_g: mul(d.fat_g, q), fiber_g: mul(d.fiber_g, q), sodium_mg: mul(d.sodium_mg, q), source: d.source || '', note: null, dish_id: d.id, qty: q });
+  });
+  saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeMealPick();
+}
+
+function openDishEdit(id) {
+  ensureDishIds();
+  var d = id ? dishById(id) : null;
+  if (id && !d) return;
+  dishEditId = d ? d.id : null;
+  d = d || {};
+  function v(x) { return (x === null || x === undefined) ? '' : escapeAttr(String(x)); }
+  function numField(label, fid, val) {
+    return '<div class="sheet-field" style="flex:1"><label class="sheet-label">' + label + '</label><input class="sheet-input" id="' + fid + '" type="number" inputmode="decimal" placeholder="optional" value="' + v(val) + '"></div>';
+  }
+  document.getElementById('dishEditTitle').innerHTML = dishEditId ? '&#9998; Edit meal' : '&#10133; Add a meal';
+  document.getElementById('dishEditBody').innerHTML =
+    '<div class="sheet-field"><label class="sheet-label">Name</label><input class="sheet-input" id="deName" placeholder="e.g. Pad kaprao muu" value="' + v(d.name) + '"></div>' +
+    '<div class="sheet-field"><label class="sheet-label">Portion</label><input class="sheet-input" id="dePortion" placeholder="e.g. 1 bowl, 3/4 cup rice" value="' + v(d.portion) + '"></div>' +
+    '<div class="sheet-label" style="margin-top:4px">Per portion (optional, fills your Food stats)</div>' +
+    '<div style="display:flex;gap:8px">' + numField('Calories', 'deCal', d.calories) + numField('Protein (g)', 'deProtein', d.protein_g) + numField('Sodium (mg)', 'deSodium', d.sodium_mg) + '</div>' +
+    '<div style="display:flex;gap:8px">' + numField('Carb (g)', 'deCarb', d.carb_g) + numField('Fat (g)', 'deFat', d.fat_g) + numField('Fiber (g)', 'deFiber', d.fiber_g) + '</div>' +
+    '<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:15px"><input type="checkbox" id="dePinned"' + (d.pinned ? ' checked' : '') + ' style="width:20px;height:20px;flex:none"><span>Keep near the top</span></label>' +
+    '<div class="import-status" id="deStatus"></div>' +
+    '<button class="sheet-btn" onclick="saveDishEdit()">' + (dishEditId ? 'Save changes' : 'Add to my list') + '</button>' +
+    (dishEditId ? '<button class="sheet-btn secondary" onclick="removeDish()">Remove from my list</button>' : '') +
+    '<button class="sheet-btn secondary" onclick="closeDishEdit()">Cancel</button>';
+  document.getElementById('dishEditOverlay').classList.add('visible');
+  document.getElementById('dishEditSheet').classList.add('visible');
+}
+
+function closeDishEdit() {
+  document.getElementById('dishEditOverlay').classList.remove('visible');
+  document.getElementById('dishEditSheet').classList.remove('visible');
+}
+
+function saveDishEdit() {
+  var name = valOrEmpty('deName');
+  if (!name) {
+    var st = document.getElementById('deStatus');
+    st.className = 'import-status error';
+    st.textContent = 'Give the meal a name.';
+    return;
+  }
+  var vals = {
+    name: name,
+    portion: valOrEmpty('dePortion'),
+    calories: numOrNull('deCal'),
+    protein_g: numOrNull('deProtein'),
+    carb_g: numOrNull('deCarb'),
+    fat_g: numOrNull('deFat'),
+    fiber_g: numOrNull('deFiber'),
+    sodium_mg: numOrNull('deSodium'),
+    pinned: !!document.getElementById('dePinned').checked
+  };
+  if (!appData.dishes) appData.dishes = [];
+  var d = dishEditId ? dishById(dishEditId) : null;
+  if (d) Object.assign(d, vals);
+  else { vals.id = genId(); vals.emoji = '&#127835;'; appData.dishes.push(vals); }
+  saveData();
+  closeDishEdit();
+  renderMealPickList();
+  renderDishes();
+}
+
+function removeDish() {
+  if (!dishEditId) return;
+  if (!confirm('Remove this meal from your list? Meals you already logged stay.')) return;
+  var gone = dishEditId;
+  appData.dishes = (appData.dishes || []).filter(function (x) { return !x || x.id !== gone; });
+  delete mealPickSel[gone];
+  saveData();
+  closeDishEdit();
+  renderMealPickList();
+  renderDishes();
+}
+
+/* --- meals list import / export --- */
+function dishNormalize(raw) {
+  var d = {};
+  Object.keys(raw).forEach(function (k) { d[k] = raw[k]; });
+  if ((d.calories === undefined || d.calories === null || d.calories === '') && d.kcal !== undefined) d.calories = d.kcal;
+  delete d.kcal;
+  d.name = String(d.name || '').trim();
+  DISH_NUM_KEYS.forEach(function (k) { if (k in d) { var n = dishNum(d[k]); if (n === null) delete d[k]; else d[k] = n; } });
+  if ('pinned' in d) d.pinned = !!d.pinned;
+  return d;
+}
+
+function dishFind(d) {
+  var list = appData.dishes || [];
+  var hit = null;
+  if (d.id) hit = list.find(function (x) { return x && x.id === d.id; }) || null;
+  if (!hit) {
+    var n = String(d.name || '').trim().toLowerCase();
+    hit = list.find(function (x) { return x && String(x.name || '').trim().toLowerCase() === n; }) || null;
+  }
+  return hit;
+}
+
+// Copies only filled-in values onto an existing meal. Never blanks a field. dryRun = just report.
+function dishMergeInto(target, src, dryRun) {
+  var changed = false;
+  Object.keys(src).forEach(function (k) {
+    if (k === 'id') return;
+    var val = src[k];
+    if (val === null || val === undefined || val === '') return;
+    if (k === 'name' && String(target.name || '').trim().toLowerCase() === String(val).trim().toLowerCase()) return;
+    if (target[k] !== val) { changed = true; if (!dryRun) target[k] = val; }
+  });
+  return changed;
+}
+
+function dishMergeList(rawList, dryRun) {
+  ensureDishIds();
+  var byName = {};
+  (rawList || []).forEach(function (raw) {
+    if (!raw || typeof raw !== 'object' || !raw.name || !String(raw.name).trim()) return;
+    var d = dishNormalize(raw);
+    var key = d.name.toLowerCase();
+    if (byName[key]) {
+      // Same meal listed twice: keep the first, fill in / override with any filled values from the later one
+      Object.keys(d).forEach(function (f) { var val = d[f]; if (val !== null && val !== undefined && val !== '') byName[key][f] = val; });
+    } else {
+      byName[key] = d;
+    }
+  });
+  var res = { added: 0, updated: 0, same: 0, total: 0 };
+  Object.keys(byName).forEach(function (key) {
+    var d = byName[key];
+    res.total++;
+    var hit = dishFind(d);
+    if (hit) {
+      if (dishMergeInto(hit, d, dryRun)) res.updated++; else res.same++;
+    } else {
+      res.added++;
+      if (!dryRun) {
+        var nd = {};
+        Object.keys(d).forEach(function (k) { nd[k] = d[k]; });
+        if (!nd.id || dishById(nd.id)) nd.id = genId();
+        if (!nd.emoji) nd.emoji = '&#127835;';
+        appData.dishes.push(nd);
+      }
+    }
+  });
+  return res;
+}
+
+function openDishIO() {
+  dishIOPending = null;
+  document.getElementById('dishIOBody').innerHTML =
+    '<label class="sheet-btn secondary" style="display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 8px;cursor:pointer">&#128206; Choose file' +
+      '<input type="file" id="dioFile" accept=".json,application/json,.txt,text/plain" style="display:none" onchange="dishIOFile(this)"></label>' +
+    '<div style="text-align:center;font-size:12px;color:var(--text-muted);margin-bottom:8px">or paste the list Claude gave you</div>' +
+    '<textarea class="import-textarea" id="dioText" placeholder="{&quot;dishes&quot;: [ ... ]}" oninput="dishIOReset()"></textarea>' +
+    '<div class="import-status" id="dioStatus"></div>' +
+    '<button class="sheet-btn secondary" onclick="dishIOCheck()">Check list</button>' +
+    '<button class="sheet-btn" id="dioApply" onclick="dishIOApply()" style="display:none">Add to my list</button>' +
+    '<button class="sheet-btn secondary" onclick="dishIOExport()">&#128228; Copy my list (to send to Claude)</button>' +
+    '<textarea class="import-textarea" id="dioOut" style="display:none"></textarea>' +
+    '<button class="sheet-btn secondary" onclick="closeDishIO()">Close</button>';
+  document.getElementById('dishIOOverlay').classList.add('visible');
+  document.getElementById('dishIOSheet').classList.add('visible');
+}
+
+function closeDishIO() {
+  document.getElementById('dishIOOverlay').classList.remove('visible');
+  document.getElementById('dishIOSheet').classList.remove('visible');
+}
+
+function dishIOReset() {
+  dishIOPending = null;
+  var b = document.getElementById('dioApply');
+  if (b) b.style.display = 'none';
+}
+
+function dishIOFile(input) {
+  var f = input.files && input.files[0];
+  if (!f) return;
+  var r = new FileReader();
+  r.onload = function (e) { document.getElementById('dioText').value = e.target.result; dishIOCheck(); };
+  r.readAsText(f);
+}
+
+function dishIOParse(raw) {
+  var data = JSON.parse(raw);
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.dishes)) return data.dishes;
+  throw new Error('not a meals list');
+}
+
+function dishIOCheck() {
+  var raw = (document.getElementById('dioText').value || '').trim();
+  var st = document.getElementById('dioStatus');
+  dishIOReset();
+  if (!raw) { st.className = 'import-status error'; st.textContent = 'Paste a list or choose a file first.'; return; }
+  var arr;
+  try { arr = dishIOParse(raw); } catch (e) {
+    st.className = 'import-status error';
+    st.textContent = 'That does not look like a meals list. It should be JSON with a "dishes" list.';
+    return;
+  }
+  var res = dishMergeList(arr, true);
+  dishIOPending = arr;
+  st.className = 'import-status success';
+  st.textContent = res.total + ' meals found: ' + res.added + ' new, ' + res.updated + ' updated, ' + res.same + ' unchanged. Nothing will be removed.';
+  if (res.added + res.updated > 0) document.getElementById('dioApply').style.display = 'block';
+}
+
+function dishIOApply() {
+  if (!dishIOPending) return;
+  var res = dishMergeList(dishIOPending, false);
+  saveData();
+  dishIOPending = null;
+  document.getElementById('dioApply').style.display = 'none';
+  var st = document.getElementById('dioStatus');
+  st.className = 'import-status success';
+  st.textContent = 'Done: ' + res.added + ' added, ' + res.updated + ' updated. Your list has ' + appData.dishes.length + ' meals.';
+  renderMealPickList();
+  renderDishes();
+}
+
+function dishIOExport() {
+  ensureDishIds();
+  var keys = ['id', 'name', 'portion', 'calories', 'protein_g', 'carb_g', 'fat_g', 'fiber_g', 'sodium_mg', 'pinned', 'cuisine', 'cook', 'rating'];
+  var out = (appData.dishes || []).map(function (d) {
+    var o = {};
+    keys.forEach(function (k) { if (d[k] !== undefined && d[k] !== null && d[k] !== '') o[k] = d[k]; });
+    return o;
+  });
+  var text = JSON.stringify({ dishes: out }, null, 2);
+  var st = document.getElementById('dioStatus');
+  var ta = document.getElementById('dioOut');
+  function manual() { ta.style.display = 'block'; ta.value = text; ta.select(); st.className = 'import-status success'; st.textContent = 'Select and copy the text below.'; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () {
+      st.className = 'import-status success';
+      st.textContent = 'Copied ' + out.length + ' meals. Paste them into your Claude chat.';
+    }).catch(manual);
+  } else {
+    manual();
+  }
+}
+
 /* ===== HABITS GRID (Piece 2) ===== */
 var HG_EXTRA_OPEN = false;
 var HG_MED_OPEN = false;
@@ -3853,11 +4328,10 @@ function hgCoreRows() {
   return [
     { label: 'Buddha offerings', type: 'habit', name: 'Buddha offerings' },
     { label: 'Make bed', type: 'habit', name: 'Make bed' },
-    { label: 'Tooth brush', type: 'habit', name: 'Tooth brush' },
-    { label: 'Shower', type: 'habit', name: 'Shower' },
+    { label: 'Brush teeth', type: 'habit', name: 'Tooth brush' },
+    { label: 'Hair-wash', type: 'habit', name: 'Shower' },
     { label: 'Retinol', type: 'habit', name: 'Retinol' },
-    { label: 'Prayers', type: 'habit', name: 'Prayers' },
-    { label: 'Medicine', type: 'medicine' }
+    { label: 'Prayers', type: 'habit', name: 'Prayers' }
   ];
 }
 
@@ -3878,7 +4352,7 @@ function hgMedSubRows(dateKeys) {
     if (!med) continue;
     if (med.start && last && last < med.start) continue;
     if (med.end && dateKeys.length && dateKeys[0] > med.end) continue;
-    out.push({ label: '\u00b7 ' + med.name, type: 'med_item', name: med.name, start: med.start || '', end: med.end || '' });
+    out.push({ label: med.name, type: 'med_item', name: med.name, start: med.start || '', end: med.end || '' });
   }
   return out;
 }
@@ -3926,13 +4400,9 @@ function renderHabitsGrid() {
   }
 
   var core = hgCoreRows();
-  for (var k = 0; k < core.length; k++) {
-    html += hgRowHtml(core[k], dateKeys, compact);
-    if (core[k].type === 'medicine') {
-      var subs = hgMedSubRows(dateKeys);
-      for (var s = 0; s < subs.length; s++) html += hgRowHtml(subs[s], dateKeys, compact);
-    }
-  }
+  for (var k = 0; k < core.length; k++) html += hgRowHtml(core[k], dateKeys, compact);
+  var subs = hgMedSubRows(dateKeys);
+  for (var s = 0; s < subs.length; s++) html += hgRowHtml(subs[s], dateKeys, compact);
 
   html += '<div class="hg-toggle" onclick="hgToggleExtra()">' + (HG_EXTRA_OPEN ? 'less' : 'more') + '</div>';
   if (HG_EXTRA_OPEN) {
