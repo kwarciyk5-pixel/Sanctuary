@@ -1046,6 +1046,10 @@ select.sheet-input { appearance: none; }
    Chip row (.qa-chips) is deliberately not touched -- chips are meant to scroll. */
 #quickAddSheet .sheet-field { box-sizing: border-box; max-width: 100%; min-width: 0; }
 #quickAddSheet .sheet-input { box-sizing: border-box; max-width: 100%; min-width: 0; }
+/* Batch Q: iOS date/time inputs ignore width unless their native look is turned off */
+.sheet-field { min-width: 0; }
+.sheet-input[type="date"], .sheet-input[type="time"] { -webkit-appearance: none; appearance: none; display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; min-height: 46px; text-align: left; }
+.sheet-input[type="date"]::-webkit-date-and-time-value, .sheet-input[type="time"]::-webkit-date-and-time-value { text-align: left; }
 
 /* Batch E: health timeline dot -- own colour, not gym/water/hubby */
 :root { --teal: #9D7CD8; }
@@ -1778,7 +1782,7 @@ function renderTimeline(dayData) {
       var tlabel = entry.time;
       if (entry.end && (entry.category === 'meal' || entry.category === 'other')) {
         tlabel = (entry.start || entry.time) + '\u2013' + entry.end;
-        if (entry.category === 'other' && typeof entry.minutes === 'number' && entry.minutes > 0) {
+        if ((entry.category === 'other' || entry.category === 'meal') && typeof entry.minutes === 'number' && entry.minutes > 0) {
           tlabel += ' (' + entry.minutes + ' min)';
         }
       }
@@ -3253,6 +3257,7 @@ function openEntryDetail(dateKey, id) {
     html = '<div class="sheet-field"><label class="sheet-label">Date</label><input class="sheet-input" id="dtDate" type="date" value="' + escapeAttr(dateKey) + '"></div>' + html;
   }
   if (meal) {
+    html += mealItemsEditHtml(meal);
     html +=
       '<div class="qa-section-label">Nutrition</div>' +
       '<div class="sheet-field"><label class="sheet-label">Calories</label><input class="sheet-input" id="dtCal" type="number" value="' + (meal.calories != null ? meal.calories : '') + '"></div>' +
@@ -3347,6 +3352,7 @@ function saveEntryDetail() {
     meal.fat_g = numOrNull('dtFat');
     meal.fiber_g = numOrNull('dtFiber');
     meal.sodium_mg = numOrNull('dtSodium');
+    applyMealItemEdits(meal, entry);
     entry.calories = meal.calories;
   }
   selectedDate = moveDetailEntryDate();
@@ -3906,9 +3912,10 @@ function openMealPick() {
     return '<option value="' + x + '"' + (x === g ? ' selected' : '') + '>' + x.charAt(0).toUpperCase() + x.slice(1) + '</option>';
   }).join('');
   document.getElementById('mealPickBody').innerHTML =
+    '<div class="sheet-field"><label class="sheet-label">Date</label><input class="sheet-input" id="mpDate" type="date" value="' + todayStr() + '"></div>' +
     '<div style="display:flex;gap:8px">' +
-      '<div class="sheet-field" style="flex:1"><label class="sheet-label">Date</label><input class="sheet-input" id="mpDate" type="date" value="' + todayStr() + '"></div>' +
-      '<div class="sheet-field" style="flex:1"><label class="sheet-label">Time</label><input class="sheet-input" id="mpTime" type="time" value="' + t + '"></div>' +
+      '<div class="sheet-field" style="flex:1;min-width:0"><label class="sheet-label">Start</label><input class="sheet-input" id="mpTime" type="time" value="' + t + '"></div>' +
+      '<div class="sheet-field" style="flex:1;min-width:0"><label class="sheet-label">End (optional)</label><input class="sheet-input" id="mpEnd" type="time" value=""></div>' +
     '</div>' +
     '<div class="sheet-field"><label class="sheet-label">Meal type</label><select class="sheet-input" id="mpType">' + opts + '</select></div>' +
     '<div class="sheet-field"><label class="sheet-label">Search my meals</label><input class="sheet-input" id="mpSearch" placeholder="type to filter" oninput="mealPickQuery = this.value; renderMealPickList()"></div>' +
@@ -4049,18 +4056,96 @@ function submitMealPick() {
   var day = ensureDay(dateKey);
   if (!day.entries) day.entries = [];
   if (!day.meals) day.meals = [];
-  function mul(v, q) { var n = dishNum(v); return n === null ? null : Math.round(n * q * 10) / 10; }
+  var endT = valOrEmpty('mpEnd');
+  var mins = endT ? minutesBetween(time, endT) : null;
+  var items = [];
   ids.forEach(function (id) {
     var d = dishById(id);
     if (!d) return;
-    var q = mealPickSel[id];
-    var desc = d.name + (q !== 1 ? ' x' + qtyLabel(q) : '');
-    var cal = mul(d.calories, q);
-    var sid = genId();
-    day.entries.push({ id: sid, time: time, start: time, end: null, minutes: null, text: desc, category: 'meal', tags: [], note: null, calories: cal });
-    day.meals.push({ id: sid, time: time, start: time, end: null, minutes: null, description: desc, meal_type: mtype, calories: cal, protein_g: mul(d.protein_g, q), carb_g: mul(d.carb_g, q), fat_g: mul(d.fat_g, q), fiber_g: mul(d.fiber_g, q), sodium_mg: mul(d.sodium_mg, q), source: d.source || '', note: null, dish_id: d.id, qty: q, qty_label: qtyLabel(q) });
+    var unit = {};
+    DISH_NUM_KEYS.forEach(function (k) { unit[k] = dishNum(d[k]); });
+    items.push({ dish_id: d.id, name: d.name, qty: mealPickSel[id], qty_label: qtyLabel(mealPickSel[id]), unit: unit });
   });
+  if (!items.length) return;
+  var tot = mealItemTotals(items);
+  var desc = mealItemsText(items);
+  var sid = genId();
+  day.entries.push({ id: sid, time: time, start: time, end: endT || null, minutes: mins, text: desc, category: 'meal', tags: [], note: null, calories: tot.calories });
+  day.meals.push({ id: sid, time: time, start: time, end: endT || null, minutes: mins, description: desc, meal_type: mtype, calories: tot.calories, protein_g: tot.protein_g, carb_g: tot.carb_g, fat_g: tot.fat_g, fiber_g: tot.fiber_g, sodium_mg: tot.sodium_mg, source: '', note: null, items: items });
   saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeMealPick();
+}
+
+/* --- combined meals: items, totals, and changing portions later --- */
+function mealItemsText(items) {
+  return items.map(function (it) { return it.name + (it.qty !== 1 ? ' x' + qtyLabel(it.qty) : ''); }).join(' + ');
+}
+
+function mealItemTotals(items) {
+  var tot = {};
+  DISH_NUM_KEYS.forEach(function (k) {
+    var sum = 0, any = false;
+    items.forEach(function (it) {
+      var u = it.unit ? it.unit[k] : null;
+      if (typeof u === 'number' && !isNaN(u)) { sum += u * it.qty; any = true; }
+    });
+    tot[k] = any ? Math.round(sum * 10) / 10 : null;
+  });
+  return tot;
+}
+
+// Items of a meal row. Meals logged one-dish-per-line before this change (dish_id + qty) are read as one item.
+function mealItemsOf(meal) {
+  if (!meal) return [];
+  if (Array.isArray(meal.items) && meal.items.length) return meal.items;
+  if (meal.dish_id && typeof meal.qty === 'number' && meal.qty > 0) {
+    var d = dishById(meal.dish_id);
+    var unit = {};
+    DISH_NUM_KEYS.forEach(function (k) { var n = dishNum(meal[k]); unit[k] = n === null ? null : n / meal.qty; });
+    return [{ dish_id: meal.dish_id, name: d ? d.name : String(meal.description || '').replace(/ x[0-9\/.]+$/, ''), qty: meal.qty, qty_label: qtyLabel(meal.qty), unit: unit }];
+  }
+  return [];
+}
+
+function mealItemsEditHtml(meal) {
+  var items = mealItemsOf(meal);
+  if (!items.length) return '';
+  var html = '<div class="qa-section-label">Portions</div>';
+  items.forEach(function (it, i) {
+    var opts = '<option value="0">Remove</option>';
+    var hit = false;
+    qtySteps().forEach(function (q) {
+      var sel = Math.abs(q - it.qty) < 0.001;
+      if (sel) hit = true;
+      opts += '<option value="' + q + '"' + (sel ? ' selected' : '') + '>' + qtyLabel(q) + '</option>';
+    });
+    if (!hit) opts += '<option value="' + it.qty + '" selected>' + qtyLabel(it.qty) + '</option>';
+    html += '<div class="sheet-field" style="display:flex;align-items:center;gap:10px">' +
+      '<label class="sheet-label" for="dtQty_' + i + '" style="flex:1;min-width:0;margin:0">' + escapeHtml(it.name) + '</label>' +
+      '<select class="sheet-input" id="dtQty_' + i + '" style="width:96px;flex:none">' + opts + '</select></div>';
+  });
+  html += '<div style="font-size:12px;color:var(--text-muted);margin:-6px 0 10px">Changing a portion recalculates the name and nutrition below.</div>';
+  return html;
+}
+
+function applyMealItemEdits(meal, entry) {
+  var items = mealItemsOf(meal);
+  if (!items.length) return;
+  var changed = false;
+  var next = [];
+  items.forEach(function (it, i) {
+    var el = document.getElementById('dtQty_' + i);
+    var q = el ? parseFloat(el.value) : it.qty;
+    if (isNaN(q)) q = it.qty;
+    if (Math.abs(q - it.qty) > 0.0001) changed = true;
+    if (q > 0) next.push({ dish_id: it.dish_id, name: it.name, qty: q, qty_label: qtyLabel(q), unit: it.unit });
+  });
+  if (!changed || !next.length) return;
+  var tot = mealItemTotals(next);
+  meal.items = next;
+  delete meal.dish_id; delete meal.qty; delete meal.qty_label;
+  meal.description = mealItemsText(next);
+  entry.text = meal.description;
+  DISH_NUM_KEYS.forEach(function (k) { meal[k] = tot[k]; });
 }
 
 function openDishEdit(id) {
