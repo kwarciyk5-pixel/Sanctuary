@@ -328,6 +328,17 @@ input, textarea, select { font-family: var(--font); }
 .stat-card-value { font-size: 22px; font-weight: 700; }
 .stat-card-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 2px; }
 .stat-card-sub { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+/* Batch O: compact Home -- 4 tiles in one row, one-row action bar */
+.stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.stat-card { padding: 10px 4px 8px; text-align: center; border-radius: var(--radius-sm); }
+.stat-card-icon { font-size: 16px; margin-bottom: 2px; }
+.stat-card-value { font-size: 16px; white-space: nowrap; }
+.stat-card-label { font-size: 10px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat-card-sub { display: none; }
+.quick-add-bar { gap: 8px; margin-bottom: 12px; }
+.quick-add-bar .qa-log-btn, .quick-add-bar .qa-water-btn, .quick-add-bar .gym-today-btn { padding: 11px 10px; font-size: 13px; white-space: nowrap; margin: 0; }
+.quick-add-bar .qa-meal-btn { display: inline-block; width: auto; flex: none; }
+.quick-add-bar .qa-gym-btn { width: 46px; flex: none; padding: 11px 0; font-size: 16px; }
 
 /* Calendar strip */
 .calendar-strip-container { margin-bottom: 16px; }
@@ -1092,11 +1103,11 @@ select.sheet-input { appearance: none; }
       </div>
 
       <div class="quick-add-bar">
-        <button class="qa-log-btn" onclick="openQuickAdd()">&#10133; Log something</button>
-        <button class="qa-water-btn" onclick="addWater(200)">&#128167; +200ml</button>
+        <button class="qa-log-btn" onclick="openQuickAdd()">&#10133; Log</button>
+        <button class="qa-water-btn qa-meal-btn" onclick="openMealPick()">&#127860; Meal</button>
+        <button class="qa-water-btn" onclick="addWater(200)">&#128167; +200</button>
+        <button class="gym-today-btn qa-gym-btn" onclick="openGym()" aria-label="Today's Session">&#127947;</button>
       </div>
-      <button class="qa-water-btn qa-meal-btn" onclick="openMealPick()">&#127860; Log meal</button>
-      <button class="gym-today-btn" onclick="openGym()">&#127947; Today's Session</button>
 
       <div class="stat-grid">
         <div class="stat-card water" onclick="switchTab('stats')">
@@ -1108,7 +1119,7 @@ select.sheet-input { appearance: none; }
         <div class="stat-card calories" onclick="switchTab('stats')">
           <div class="stat-card-icon">&#127860;</div>
           <div class="stat-card-value" id="homeCalories">--</div>
-          <div class="stat-card-label">Calories (est)</div>
+          <div class="stat-card-label">Calories</div>
           <div class="stat-card-sub" id="homeCalSub">&nbsp;</div>
         </div>
         <div class="stat-card sleep" onclick="switchTab('stats')">
