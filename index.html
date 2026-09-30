@@ -930,6 +930,13 @@ select.sheet-input { appearance: none; }
 .dish-meta { margin-top: 1px; }
 .dish-stars { display: inline; margin: 0 0 0 4px; font-size: 10px; }
 #dishEditSheet, #dishIOSheet { z-index: 211; }
+/* Batch X: recipe view sheet + recipe field */
+#dishViewOverlay { z-index: 210; }
+#dishViewSheet { z-index: 211; }
+.dv-recipe { font-size: 14px; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; line-height: 1.5; margin: 10px 0 14px; }
+.dv-recipe-input { resize: vertical; min-height: 110px; line-height: 1.5; font-family: inherit; }
+.dv-empty { font-size: 13px; color: var(--text-muted); margin: 10px 0 14px; }
+.dv-edit-btn { width: 34px; height: 34px; border-radius: 10px; background: transparent; color: var(--text-secondary); font-size: 15px; flex: none; }
 .qa-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scrollbar-width: none; }
 .qa-chips::-webkit-scrollbar { display: none; }
 .qa-chip {
@@ -1488,6 +1495,12 @@ select.sheet-input { appearance: none; }
   <div class="sheet-handle"></div>
   <div class="sheet-title" id="dishEditTitle">&#9998; Edit meal</div>
   <div id="dishEditBody"></div>
+</div>
+<div class="sheet-overlay" id="dishViewOverlay" onclick="closeDishView()"></div>
+<div class="bottom-sheet" id="dishViewSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="dishViewTitle"></div>
+  <div id="dishViewBody"></div>
 </div>
 <div class="sheet-overlay" id="dishIOOverlay" onclick="closeDishIO()"></div>
 <div class="bottom-sheet" id="dishIOSheet">
@@ -2384,16 +2397,18 @@ function renderDishes() {
 
   let html = '';
   list.forEach(dish => {
-    html += '<div class="dish-card" data-id="' + escapeAttr(dish.id || '') + '" onclick="if (this.dataset.id) openDishEdit(this.dataset.id)" style="cursor:pointer">';
+    html += '<div class="dish-card" data-id="' + escapeAttr(dish.id || '') + '" onclick="if (this.dataset.id) openDishView(this.dataset.id)" style="cursor:pointer">';
     html += '<div class="dish-emoji">' + dishEmoji(dish) + '</div>';
     html += '<div class="dish-info">';
-    html += '<div class="dish-name">' + (dish.pinned ? '&#128204; ' : '') + escapeHtml(dish.name) + '</div>';
+    html += '<div class="dish-name">' + (dish.pinned ? '&#128204; ' : '') + escapeHtml(dish.name) + (dishHasRecipe(dish) ? ' &#x1F4D6;' : '') + '</div>';
     html += '<div class="dish-meta">' + escapeHtml(dish.cuisine || '') + (dish.cook ? ' \u00b7 ' + escapeHtml(cookLabel(dish.cook)) : '') + (dish.calories ? ' \u00b7 ~' + dish.calories + ' cal' : '');
     if (dish.rating) {
       html += '<span class="dish-stars">' + '\u2b50'.repeat(Math.min(dish.rating, 5)) + '</span>';
     }
     html += '</div>';
-    html += '</div></div>';
+    html += '</div>';
+    html += '<button class="dv-edit-btn" aria-label="Edit ' + escapeAttr(dish.name) + '" data-id="' + escapeAttr(dish.id || '') + '" onclick="event.stopPropagation(); if (this.dataset.id) openDishEdit(this.dataset.id)">&#x270F;&#xFE0F;</button>';
+    html += '</div>';
   });
   container.innerHTML = html;
 }
@@ -4153,6 +4168,7 @@ function dishCuisinesPresent() {
 
 // 'all', 'pinned' (Frequent) or a cuisine that still exists; anything else falls back to 'all'
 function dishFilterOk(f) {
+  if (f === 'recipes') return (appData.dishes || []).some(dishHasRecipe);
   return f === 'all' || f === 'pinned' || dishCuisinesPresent().indexOf(f) >= 0;
 }
 
@@ -4163,6 +4179,7 @@ function dishFilterList(query, filter) {
     if (!d || !d.name) return false;
     if (q && String(d.name).toLowerCase().indexOf(q) < 0) return false;
     if (filter === 'pinned') return !!d.pinned;
+    if (filter === 'recipes') return dishHasRecipe(d);
     if (filter && filter !== 'all') return dishCuisineOf(d) === filter;
     return true;
   });
@@ -4175,6 +4192,7 @@ function dishFilterList(query, filter) {
 
 function dishChipsHtml(active, handler) {
   var chips = [['all', 'All'], ['pinned', '📌 Frequent']];
+  if ((appData.dishes || []).some(dishHasRecipe)) chips.push(['recipes', '\uD83D\uDCD6 Recipes']);
   dishCuisinesPresent().forEach(function (c) { chips.push([c, c]); });
   return '<div class="dish-chips">' + chips.map(function (c) {
     return '<button type="button" class="dish-chip' + (c[0] === active ? ' on' : '') + '" data-f="' + escapeAttr(c[0]) + '" onclick="' + handler + '(this.dataset.f)">' + escapeHtml(c[1]) + '</button>';
@@ -4212,7 +4230,7 @@ function renderMealPickList() {
       html += '<div class="mp-row' + (qn ? ' on' : '') + '">';
       html += '<div class="mp-main" data-id="' + did + '" onclick="mpToggle(this.dataset.id)">';
       html += '<div class="mp-box">' + (qn ? '&#10003;' : '') + '</div>';
-      html += '<div style="min-width:0"><div class="mp-name">' + (d.pinned ? '&#128204; ' : '') + dishEmoji(d) + ' ' + escapeHtml(d.name) + '</div>';
+      html += '<div style="min-width:0"><div class="mp-name">' + (d.pinned ? '&#128204; ' : '') + dishEmoji(d) + ' ' + escapeHtml(d.name) + (dishHasRecipe(d) ? ' &#x1F4D6;' : '') + '</div>';
       if (meta) html += '<div class="mp-meta">' + meta + '</div>';
       html += '</div></div>';
       if (qn) {
@@ -4424,6 +4442,7 @@ function openDishEdit(id) {
       '<div class="sheet-field" style="flex:1"><label class="sheet-label">Who cooks</label><select class="sheet-input" id="deCook">' + cookOptionsHtml(d.cook || '') + '</select></div>' +
       '<div class="sheet-field" style="flex:1"><label class="sheet-label">Cuisine</label><select class="sheet-input" id="deCuisine">' + cuisineOptionsHtml(d.cuisine || '') + '</select></div>' +
     '</div>' +
+    '<div class="sheet-field"><label class="sheet-label">Notes / recipe</label><textarea id="deRecipe" class="sheet-input dv-recipe-input" rows="6" placeholder="Ingredients, steps, anything">' + (d.recipe ? escapeAttr(String(d.recipe)) : '') + '</textarea></div>' +
     '<div class="sheet-field"><label class="sheet-label">Rating (1-5)</label><input class="sheet-input" id="deRating" type="number" inputmode="numeric" min="1" max="5" placeholder="optional" value="' + v(d.rating) + '"></div>' +
     '<div class="sheet-label" style="margin-top:4px">Per portion (optional, fills your Food stats)</div>' +
     '<div style="display:flex;gap:8px">' + numField('Calories', 'deCal', d.calories) + numField('Protein (g)', 'deProtein', d.protein_g) + numField('Sodium (mg)', 'deSodium', d.sodium_mg) + '</div>' +
@@ -4440,6 +4459,38 @@ function openDishEdit(id) {
 function closeDishEdit() {
   document.getElementById('dishEditOverlay').classList.remove('visible');
   document.getElementById('dishEditSheet').classList.remove('visible');
+}
+
+function dishHasRecipe(d) { return !!(d && d.recipe && String(d.recipe).trim()); }
+
+// Batch X: read-only recipe view (Lists -> Dishes)
+function openDishView(id) {
+  var d = dishById(id);
+  if (!d) return;
+  var parts = [];
+  if (d.portion) parts.push(escapeHtml(d.portion));
+  if (dishNum(d.calories)) parts.push('~' + dishNum(d.calories) + ' cal');
+  if (dishNum(d.protein_g)) parts.push('P ' + dishNum(d.protein_g) + 'g');
+  if (d.cook) parts.push(escapeHtml(cookLabel(d.cook)));
+  if (d.cuisine) parts.push(escapeHtml(d.cuisine));
+  var r = dishNum(d.rating);
+  if (r && r > 0) parts.push('<span class="dish-stars">' + '⭐'.repeat(Math.min(Math.round(r), 5)) + '</span>');
+  var did = escapeAttr(d.id);
+  var html = '';
+  if (parts.length) html += '<div class="dish-meta">' + parts.join(' · ') + '</div>';
+  if (dishHasRecipe(d)) html += '<div class="dv-recipe">' + escapeHtml(String(d.recipe)) + '</div>';
+  else html += '<div class="dv-empty">No notes / recipe yet</div>';
+  html += '<button class="sheet-btn" data-id="' + did + '" onclick="closeDishView(); openDishEdit(this.dataset.id)">✏️ Edit</button>';
+  html += '<button class="sheet-btn secondary" onclick="closeDishView()">Close</button>';
+  document.getElementById('dishViewTitle').innerHTML = dishEmoji(d) + ' ' + escapeHtml(d.name);
+  document.getElementById('dishViewBody').innerHTML = html;
+  document.getElementById('dishViewOverlay').classList.add('visible');
+  document.getElementById('dishViewSheet').classList.add('visible');
+}
+
+function closeDishView() {
+  document.getElementById('dishViewOverlay').classList.remove('visible');
+  document.getElementById('dishViewSheet').classList.remove('visible');
 }
 
 function saveDishEdit() {
@@ -4466,8 +4517,11 @@ function saveDishEdit() {
   };
   if (!appData.dishes) appData.dishes = [];
   var d = dishEditId ? dishById(dishEditId) : null;
+  var reEl = document.getElementById('deRecipe');
+  var recipe = reEl ? reEl.value.trim() : '';
   if (d) Object.assign(d, vals);
-  else { vals.id = genId(); vals.emoji = '&#127835;'; appData.dishes.push(vals); }
+  else { vals.id = genId(); vals.emoji = '&#127835;'; appData.dishes.push(vals); d = vals; }
+  if (recipe) d.recipe = recipe; else delete d.recipe;
   saveData();
   closeDishEdit();
   renderMealPickList();
