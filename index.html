@@ -898,7 +898,7 @@ select.sheet-input { appearance: none; }
 .mp-meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 .mp-qty { display: flex; align-items: center; gap: 4px; }
 .mp-qty button { width: 32px; height: 32px; border-radius: 10px; background: var(--bg); font-size: 16px; font-weight: 700; color: var(--text-primary); }
-.mp-count { min-width: 24px; text-align: center; font-size: 13px; font-weight: 700; }
+.mp-count { min-width: 34px; text-align: center; font-size: 13px; font-weight: 700; }
 .mp-edit { width: 40px; height: 40px; border-radius: 10px; background: transparent; color: var(--text-secondary); font-size: 16px; flex: none; }
 #dishEditOverlay, #dishIOOverlay { z-index: 210; }
 #dishEditSheet, #dishIOSheet { z-index: 211; }
@@ -2207,7 +2207,7 @@ function renderDishes() {
     html += '<div class="dish-emoji">' + (dish.emoji || '&#127835;') + '</div>';
     html += '<div class="dish-info">';
     html += '<div class="dish-name">' + escapeHtml(dish.name) + '</div>';
-    html += '<div class="dish-meta">' + (dish.cuisine || '') + (dish.cook ? ' \u00b7 ' + dish.cook : '') + (dish.calories ? ' \u00b7 ~' + dish.calories + ' cal' : '') + '</div>';
+    html += '<div class="dish-meta">' + (dish.cuisine || '') + (dish.cook ? ' \u00b7 ' + cookLabel(dish.cook) : '') + (dish.calories ? ' \u00b7 ~' + dish.calories + ' cal' : '') + '</div>';
     if (dish.rating) {
       html += '<div class="dish-stars">' + '\u2b50'.repeat(Math.min(dish.rating, 5)) + '</div>';
     }
@@ -2714,7 +2714,7 @@ function openAddSheet() {
       content.innerHTML =
         '<div class="sheet-field"><label class="sheet-label">Dish Name</label><input class="sheet-input" id="newDishName" placeholder="e.g. Pad kaprao muu"></div>' +
         '<div class="sheet-field"><label class="sheet-label">Cuisine</label><select class="sheet-input" id="newDishCuisine"><option value="Thai">Thai</option><option value="Burmese">Burmese</option><option value="Korean">Korean</option><option value="Japanese">Japanese</option><option value="Western">Western</option><option value="Snack">Snack</option><option value="Other">Other</option></select></div>' +
-        '<div class="sheet-field"><label class="sheet-label">Who Cooks</label><select class="sheet-input" id="newDishCook"><option value="hubby">Hubby</option><option value="both">Both</option><option value="iris">Me</option><option value="restaurant">Restaurant</option></select></div>' +
+        '<div class="sheet-field"><label class="sheet-label">Who Cooks</label><select class="sheet-input" id="newDishCook">' + cookOptionsHtml('hubby') + '</select></div>' +
         '<div class="sheet-field"><label class="sheet-label">Rating (1-5)</label><input class="sheet-input" id="newDishRating" type="number" min="1" max="5" placeholder="5"></div>' +
         '<div class="sheet-field"><label class="sheet-label">Est. Calories</label><input class="sheet-input" id="newDishCal" type="number" placeholder="optional"></div>' +
         '<button class="sheet-btn" onclick="submitNewDish()">Add Dish</button>' +
@@ -3930,6 +3930,7 @@ function closeMealPick() {
 
 function dishMetaLine(d) {
   var parts = [];
+  if (d.cook) parts.push(escapeHtml(cookLabel(d.cook)));
   if (d.portion) parts.push(escapeHtml(d.portion));
   if (dishNum(d.calories)) parts.push('~' + dishNum(d.calories) + ' cal');
   if (dishNum(d.protein_g)) parts.push(dishNum(d.protein_g) + 'g protein');
@@ -3963,7 +3964,7 @@ function renderMealPickList() {
       html += '</div></div>';
       if (qn) {
         html += '<div class="mp-qty"><button aria-label="Less" data-id="' + did + '" onclick="mpStep(this.dataset.id, -1)">&minus;</button>' +
-          '<span class="mp-count">&times;' + qn + '</span>' +
+          '<span class="mp-count">&times;' + qtyLabel(qn) + '</span>' +
           '<button aria-label="More" data-id="' + did + '" onclick="mpStep(this.dataset.id, 1)">+</button></div>';
       }
       html += '<button class="mp-edit" aria-label="Edit ' + escapeAttr(d.name) + '" data-id="' + did + '" onclick="openDishEdit(this.dataset.id)">&#9998;</button>';
@@ -3971,8 +3972,7 @@ function renderMealPickList() {
     });
     el.innerHTML = html;
   }
-  var n = 0;
-  Object.keys(mealPickSel).forEach(function (k) { n += mealPickSel[k]; });
+  var n = Object.keys(mealPickSel).length;
   var btn = document.getElementById('mpLogBtn');
   if (btn) btn.textContent = n ? 'Log ' + n + (n === 1 ? ' item' : ' items') : 'Log';
 }
@@ -3983,11 +3983,56 @@ function mpToggle(id) {
   renderMealPickList();
 }
 
+// Portion steps for the -/+ buttons: 1/4, 1/3, 1/2, 2/3, 1, then whole numbers.
+function qtySteps() { return [0.25, 1 / 3, 0.5, 2 / 3, 1, 2, 3, 4, 5, 6, 8, 10]; }
+
+function qtyLabel(q) {
+  var fr = [[0.25, '1/4'], [1 / 3, '1/3'], [0.5, '1/2'], [2 / 3, '2/3']];
+  for (var i = 0; i < fr.length; i++) { if (Math.abs(q - fr[i][0]) < 0.001) return fr[i][1]; }
+  return String(Math.round(q * 100) / 100);
+}
+
 function mpStep(id, delta) {
-  var n = (mealPickSel[id] || 0) + delta;
-  if (n <= 0) delete mealPickSel[id];
-  else mealPickSel[id] = n;
+  var steps = qtySteps();
+  var cur = mealPickSel[id] || 0;
+  var idx = -1;
+  for (var i = 0; i < steps.length; i++) { if (Math.abs(steps[i] - cur) < 0.001) { idx = i; break; } }
+  var next;
+  if (idx < 0) next = cur + delta;
+  else if (idx + delta < 0) next = 0;
+  else if (idx + delta >= steps.length) next = cur + delta;
+  else next = steps[idx + delta];
+  if (!(next > 0)) delete mealPickSel[id];
+  else mealPickSel[id] = next;
   renderMealPickList();
+}
+
+// Who cooks: stored values stay the same ('restaurant' now shows as Take out), new ones added.
+function cookChoices() {
+  return [['hubby', 'Hubby'], ['both', 'Both'], ['iris', 'Me'], ['ygn_home', 'Ygn Home'], ['ahtg_home', 'Ahtg Home'], ['restaurant', 'Take out'], ['ready_made', 'Ready Made / Instant']];
+}
+
+function cookLabel(v) {
+  var c = cookChoices();
+  for (var i = 0; i < c.length; i++) { if (c[i][0] === v) return c[i][1]; }
+  return v || '';
+}
+
+function cookOptionsHtml(sel) {
+  var c = cookChoices();
+  var known = c.some(function (x) { return x[0] === sel; });
+  var html = sel ? '' : '<option value="">--</option>';
+  if (sel && !known) html += '<option value="' + escapeAttr(sel) + '" selected>' + escapeHtml(sel) + '</option>';
+  c.forEach(function (x) { html += '<option value="' + x[0] + '"' + (x[0] === sel ? ' selected' : '') + '>' + x[1] + '</option>'; });
+  return html;
+}
+
+function cuisineOptionsHtml(sel) {
+  var c = ['Thai', 'Burmese', 'Korean', 'Japanese', 'Western', 'Snack', 'Other'];
+  var html = sel ? '' : '<option value="">--</option>';
+  if (sel && c.indexOf(sel) < 0) html += '<option value="' + escapeAttr(sel) + '" selected>' + escapeHtml(sel) + '</option>';
+  c.forEach(function (x) { html += '<option value="' + x + '"' + (x === sel ? ' selected' : '') + '>' + x + '</option>'; });
+  return html;
 }
 
 function submitMealPick() {
@@ -4009,11 +4054,11 @@ function submitMealPick() {
     var d = dishById(id);
     if (!d) return;
     var q = mealPickSel[id];
-    var desc = d.name + (q > 1 ? ' x' + q : '');
+    var desc = d.name + (q !== 1 ? ' x' + qtyLabel(q) : '');
     var cal = mul(d.calories, q);
     var sid = genId();
     day.entries.push({ id: sid, time: time, start: time, end: null, minutes: null, text: desc, category: 'meal', tags: [], note: null, calories: cal });
-    day.meals.push({ id: sid, time: time, start: time, end: null, minutes: null, description: desc, meal_type: mtype, calories: cal, protein_g: mul(d.protein_g, q), carb_g: mul(d.carb_g, q), fat_g: mul(d.fat_g, q), fiber_g: mul(d.fiber_g, q), sodium_mg: mul(d.sodium_mg, q), source: d.source || '', note: null, dish_id: d.id, qty: q });
+    day.meals.push({ id: sid, time: time, start: time, end: null, minutes: null, description: desc, meal_type: mtype, calories: cal, protein_g: mul(d.protein_g, q), carb_g: mul(d.carb_g, q), fat_g: mul(d.fat_g, q), fiber_g: mul(d.fiber_g, q), sodium_mg: mul(d.sodium_mg, q), source: d.source || '', note: null, dish_id: d.id, qty: q, qty_label: qtyLabel(q) });
   });
   saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeMealPick();
 }
@@ -4032,6 +4077,11 @@ function openDishEdit(id) {
   document.getElementById('dishEditBody').innerHTML =
     '<div class="sheet-field"><label class="sheet-label">Name</label><input class="sheet-input" id="deName" placeholder="e.g. Pad kaprao muu" value="' + v(d.name) + '"></div>' +
     '<div class="sheet-field"><label class="sheet-label">Portion</label><input class="sheet-input" id="dePortion" placeholder="e.g. 1 bowl, 3/4 cup rice" value="' + v(d.portion) + '"></div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<div class="sheet-field" style="flex:1"><label class="sheet-label">Who cooks</label><select class="sheet-input" id="deCook">' + cookOptionsHtml(d.cook || '') + '</select></div>' +
+      '<div class="sheet-field" style="flex:1"><label class="sheet-label">Cuisine</label><select class="sheet-input" id="deCuisine">' + cuisineOptionsHtml(d.cuisine || '') + '</select></div>' +
+    '</div>' +
+    '<div class="sheet-field"><label class="sheet-label">Rating (1-5)</label><input class="sheet-input" id="deRating" type="number" inputmode="numeric" min="1" max="5" placeholder="optional" value="' + v(d.rating) + '"></div>' +
     '<div class="sheet-label" style="margin-top:4px">Per portion (optional, fills your Food stats)</div>' +
     '<div style="display:flex;gap:8px">' + numField('Calories', 'deCal', d.calories) + numField('Protein (g)', 'deProtein', d.protein_g) + numField('Sodium (mg)', 'deSodium', d.sodium_mg) + '</div>' +
     '<div style="display:flex;gap:8px">' + numField('Carb (g)', 'deCarb', d.carb_g) + numField('Fat (g)', 'deFat', d.fat_g) + numField('Fiber (g)', 'deFiber', d.fiber_g) + '</div>' +
@@ -4066,6 +4116,9 @@ function saveDishEdit() {
     fat_g: numOrNull('deFat'),
     fiber_g: numOrNull('deFiber'),
     sodium_mg: numOrNull('deSodium'),
+    cook: valOrEmpty('deCook'),
+    cuisine: valOrEmpty('deCuisine'),
+    rating: numOrNull('deRating'),
     pinned: !!document.getElementById('dePinned').checked
   };
   if (!appData.dishes) appData.dishes = [];
