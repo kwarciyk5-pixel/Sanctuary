@@ -4120,6 +4120,7 @@ function openMealPick() {
     '<div id="mpChips"></div>' +
     '<div id="mpList"></div>' +
     '<button class="sheet-btn secondary" onclick="openDishEdit(null)">&#10133; Add a meal to my list</button>' +
+    '<div class="sheet-field"><label class="sheet-label">Note (optional)</label><input class="sheet-input" id="mpNote" autocomplete="off" placeholder="extras not in the list, changes, anything"></div>' +
     '<div class="import-status" id="mpStatus"></div>' +
     '<button class="sheet-btn" id="mpLogBtn" onclick="submitMealPick()">Log</button>' +
     '<button class="sheet-btn secondary" onclick="closeMealPick()">Cancel</button>';
@@ -4326,8 +4327,9 @@ function submitMealPick() {
   var tot = mealItemTotals(items);
   var desc = mealItemsText(items);
   var sid = genId();
-  day.entries.push({ id: sid, time: time, start: time, end: endT || null, minutes: mins, text: desc, category: 'meal', tags: [], note: null, calories: tot.calories });
-  day.meals.push({ id: sid, time: time, start: time, end: endT || null, minutes: mins, description: desc, meal_type: mtype, calories: tot.calories, protein_g: tot.protein_g, carb_g: tot.carb_g, fat_g: tot.fat_g, fiber_g: tot.fiber_g, sodium_mg: tot.sodium_mg, source: '', note: null, items: items });
+  var mnote = valOrEmpty('mpNote') || null;
+  day.entries.push({ id: sid, time: time, start: time, end: endT || null, minutes: mins, text: desc, category: 'meal', tags: [], note: mnote, calories: tot.calories });
+  day.meals.push({ id: sid, time: time, start: time, end: endT || null, minutes: mins, description: desc, meal_type: mtype, calories: tot.calories, protein_g: tot.protein_g, carb_g: tot.carb_g, fat_g: tot.fat_g, fiber_g: tot.fiber_g, sodium_mg: tot.sodium_mg, source: '', note: mnote, items: items });
   saveData(); selectedDate = dateKey; renderHome(); renderStats(); closeMealPick();
 }
 
