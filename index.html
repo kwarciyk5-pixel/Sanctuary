@@ -568,7 +568,7 @@ input, textarea, select { font-family: var(--font); }
 .task-priority.medium { background: var(--yellow-deep); }
 /* Batch R: tasks */
 .task-categories { padding-top: 8px; padding-right: 8px; }
-.task-priority.high { background: #F0443A; }
+.task-priority.high { background: #E5736A; }
 .task-priority.medium { background: #FFD60A; }
 .task-meta-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-tools { display: flex; justify-content: flex-end; margin: -6px 0 10px; }
@@ -913,6 +913,22 @@ select.sheet-input { appearance: none; }
 .mp-count { min-width: 34px; text-align: center; font-size: 13px; font-weight: 700; }
 .mp-edit { width: 40px; height: 40px; border-radius: 10px; background: transparent; color: var(--text-secondary); font-size: 16px; flex: none; }
 #dishEditOverlay, #dishIOOverlay { z-index: 210; }
+/* Batch V: meals-list search, filter chips, compact rows (overrides the rules above) */
+.dish-search { margin-bottom: 8px; }
+.dish-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.dish-chips::-webkit-scrollbar { display: none; }
+.dish-chip { flex: none; padding: 6px 12px; border-radius: 999px; background: var(--bg-card); color: var(--text-secondary); font-size: 12px; font-weight: 600; border: 1.5px solid rgba(0, 0, 0, 0.08); white-space: nowrap; cursor: pointer; }
+.dish-chip.on { border-color: var(--lavender-deep); color: var(--lavender-deep); }
+.mp-row { padding: 4px 6px 4px 10px; margin-bottom: 5px; }
+.mp-main { min-height: 34px; gap: 8px; }
+.mp-meta { margin-top: 1px; }
+.mp-qty button { width: 30px; height: 30px; }
+.mp-edit { width: 34px; height: 34px; }
+.dish-card { padding: 8px 12px; gap: 10px; margin-bottom: 6px; align-items: center; }
+.dish-emoji { font-size: 22px; }
+.dish-info { min-width: 0; }
+.dish-meta { margin-top: 1px; }
+.dish-stars { display: inline; margin: 0 0 0 4px; font-size: 10px; }
 #dishEditSheet, #dishIOSheet { z-index: 211; }
 .qa-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; scrollbar-width: none; }
 .qa-chips::-webkit-scrollbar { display: none; }
@@ -1320,6 +1336,8 @@ select.sheet-input { appearance: none; }
       </div>
 
       <div class="lists-panel active" id="listsDishes">
+        <input class="sheet-input dish-search" id="dishSearch" type="search" placeholder="Search my meals" autocomplete="off" oninput="dishListQuery = this.value; renderDishes()">
+        <div id="dishChips"></div>
         <div id="dishList">
           <div class="empty-state">
             <div class="empty-state-emoji">&#127859;</div>
@@ -2345,21 +2363,36 @@ function renderDishes() {
   ensureDishIds();
   const container = document.getElementById('dishList');
   const dishes = appData.dishes || [];
+  const searchEl = document.getElementById('dishSearch');
   if (dishes.length === 0) {
+    if (searchEl) searchEl.style.display = 'none';
+    const emptyChips = document.getElementById('dishChips');
+    if (emptyChips) emptyChips.innerHTML = '';
     container.innerHTML = '<div class="empty-state"><div class="empty-state-emoji">&#127859;</div><div>No dishes yet. Tap + to add a favorite.</div></div>';
+    return;
+  }
+  if (searchEl) searchEl.style.display = '';
+
+  if (!dishFilterOk(dishListFilter)) dishListFilter = 'all';
+  const chipsEl = document.getElementById('dishChips');
+  if (chipsEl) chipsEl.innerHTML = dishChipsHtml(dishListFilter, 'setDishListFilter');
+  const list = dishFilterList(dishListQuery, dishListFilter);
+  if (!list.length) {
+    container.innerHTML = '<div class="empty-state"><div>No meals match that.</div></div>';
     return;
   }
 
   let html = '';
-  dishes.forEach(dish => {
+  list.forEach(dish => {
     html += '<div class="dish-card" data-id="' + escapeAttr(dish.id || '') + '" onclick="if (this.dataset.id) openDishEdit(this.dataset.id)" style="cursor:pointer">';
     html += '<div class="dish-emoji">' + dishEmoji(dish) + '</div>';
     html += '<div class="dish-info">';
-    html += '<div class="dish-name">' + escapeHtml(dish.name) + '</div>';
-    html += '<div class="dish-meta">' + (dish.cuisine || '') + (dish.cook ? ' \u00b7 ' + cookLabel(dish.cook) : '') + (dish.calories ? ' \u00b7 ~' + dish.calories + ' cal' : '') + '</div>';
+    html += '<div class="dish-name">' + (dish.pinned ? '&#128204; ' : '') + escapeHtml(dish.name) + '</div>';
+    html += '<div class="dish-meta">' + escapeHtml(dish.cuisine || '') + (dish.cook ? ' \u00b7 ' + escapeHtml(cookLabel(dish.cook)) : '') + (dish.calories ? ' \u00b7 ~' + dish.calories + ' cal' : '');
     if (dish.rating) {
-      html += '<div class="dish-stars">' + '\u2b50'.repeat(Math.min(dish.rating, 5)) + '</div>';
+      html += '<span class="dish-stars">' + '\u2b50'.repeat(Math.min(dish.rating, 5)) + '</span>';
     }
+    html += '</div>';
     html += '</div></div>';
   });
   container.innerHTML = html;
@@ -4070,6 +4103,7 @@ function openMealPick() {
   ensureDishIds();
   mealPickSel = {};
   mealPickQuery = '';
+  mealPickFilter = 'all';
   var t = nowTime();
   var g = mealTypeGuess(t);
   var opts = ['breakfast', 'lunch', 'dinner', 'supper', 'snack'].map(function (x) {
@@ -4082,10 +4116,10 @@ function openMealPick() {
       '<div class="sheet-field" style="flex:1;min-width:0"><label class="sheet-label">End (optional)</label><input class="sheet-input" id="mpEnd" type="time" value=""></div>' +
     '</div>' +
     '<div class="sheet-field"><label class="sheet-label">Meal type</label><select class="sheet-input" id="mpType">' + opts + '</select></div>' +
-    '<div class="sheet-field"><label class="sheet-label">Search my meals</label><input class="sheet-input" id="mpSearch" placeholder="type to filter" oninput="mealPickQuery = this.value; renderMealPickList()"></div>' +
+    '<div class="sheet-field" style="margin-bottom:6px"><label class="sheet-label">Search my meals</label><input class="sheet-input" id="mpSearch" type="search" autocomplete="off" placeholder="type to filter" oninput="mealPickQuery = this.value; renderMealPickList()"></div>' +
+    '<div id="mpChips"></div>' +
     '<div id="mpList"></div>' +
     '<button class="sheet-btn secondary" onclick="openDishEdit(null)">&#10133; Add a meal to my list</button>' +
-    '<button class="sheet-btn secondary" onclick="openDishIO()">&#128229; Import / export my list</button>' +
     '<div class="import-status" id="mpStatus"></div>' +
     '<button class="sheet-btn" id="mpLogBtn" onclick="submitMealPick()">Log</button>' +
     '<button class="sheet-btn secondary" onclick="closeMealPick()">Cancel</button>';
@@ -4098,6 +4132,56 @@ function closeMealPick() {
   document.getElementById('mealPickOverlay').classList.remove('visible');
   document.getElementById('mealPickSheet').classList.remove('visible');
 }
+
+/* --- Batch V: meals-list search + filter (shared by Log meal and Lists → Dishes) --- */
+var mealPickFilter = 'all';
+var dishListQuery = '';
+var dishListFilter = 'all';
+var DISH_CUISINE_ORDER = ['Burmese', 'Thai', 'Korean', 'Japanese', 'Western', 'Other', 'Snack', 'Drink', 'Dessert'];
+
+function dishCuisineOf(d) { return String((d && d.cuisine) || 'Other'); }
+
+// Cuisines actually present in the list: known ones in fixed order, then any unknown stored value
+function dishCuisinesPresent() {
+  var have = {};
+  (appData.dishes || []).forEach(function (d) { if (d && d.name) have[dishCuisineOf(d)] = true; });
+  var out = DISH_CUISINE_ORDER.filter(function (c) { return have[c]; });
+  Object.keys(have).forEach(function (c) { if (out.indexOf(c) < 0) out.push(c); });
+  return out;
+}
+
+// 'all', 'pinned' (Frequent) or a cuisine that still exists; anything else falls back to 'all'
+function dishFilterOk(f) {
+  return f === 'all' || f === 'pinned' || dishCuisinesPresent().indexOf(f) >= 0;
+}
+
+// Search (name contains) + filter; Frequent first, then A-Z
+function dishFilterList(query, filter) {
+  var q = String(query || '').trim().toLowerCase();
+  var list = (appData.dishes || []).filter(function (d) {
+    if (!d || !d.name) return false;
+    if (q && String(d.name).toLowerCase().indexOf(q) < 0) return false;
+    if (filter === 'pinned') return !!d.pinned;
+    if (filter && filter !== 'all') return dishCuisineOf(d) === filter;
+    return true;
+  });
+  list.sort(function (a, b) {
+    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+    return String(a.name).localeCompare(String(b.name));
+  });
+  return list;
+}
+
+function dishChipsHtml(active, handler) {
+  var chips = [['all', 'All'], ['pinned', '📌 Frequent']];
+  dishCuisinesPresent().forEach(function (c) { chips.push([c, c]); });
+  return '<div class="dish-chips">' + chips.map(function (c) {
+    return '<button type="button" class="dish-chip' + (c[0] === active ? ' on' : '') + '" data-f="' + escapeAttr(c[0]) + '" onclick="' + handler + '(this.dataset.f)">' + escapeHtml(c[1]) + '</button>';
+  }).join('') + '</div>';
+}
+
+function setMealPickFilter(f) { mealPickFilter = f || 'all'; renderMealPickList(); }
+function setDishListFilter(f) { dishListFilter = f || 'all'; renderDishes(); }
 
 function dishMetaLine(d) {
   var parts = [];
@@ -4112,15 +4196,12 @@ function renderMealPickList() {
   var el = document.getElementById('mpList');
   if (!el) return;
   var q = String(mealPickQuery || '').trim().toLowerCase();
-  var list = (appData.dishes || []).filter(function (d) {
-    return d && d.name && (!q || String(d.name).toLowerCase().indexOf(q) >= 0);
-  });
-  list.sort(function (a, b) {
-    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-    return String(a.name).localeCompare(String(b.name));
-  });
+  if (!dishFilterOk(mealPickFilter)) mealPickFilter = 'all';
+  var chipsEl = document.getElementById('mpChips');
+  if (chipsEl) chipsEl.innerHTML = (appData.dishes || []).length ? dishChipsHtml(mealPickFilter, 'setMealPickFilter') : '';
+  var list = dishFilterList(q, mealPickFilter);
   if (!list.length) {
-    el.innerHTML = '<div class="empty-state"><div>' + (q ? 'No meals match that.' : 'Your list is empty. Add a meal or import a list.') + '</div></div>';
+    el.innerHTML = '<div class="empty-state"><div>' + ((q || mealPickFilter !== 'all') ? 'No meals match that.' : 'Your list is empty. Tap Add a meal to my list.') + '</div></div>';
   } else {
     var html = '';
     list.forEach(function (d) {
@@ -4345,7 +4426,7 @@ function openDishEdit(id) {
     '<div class="sheet-label" style="margin-top:4px">Per portion (optional, fills your Food stats)</div>' +
     '<div style="display:flex;gap:8px">' + numField('Calories', 'deCal', d.calories) + numField('Protein (g)', 'deProtein', d.protein_g) + numField('Sodium (mg)', 'deSodium', d.sodium_mg) + '</div>' +
     '<div style="display:flex;gap:8px">' + numField('Carb (g)', 'deCarb', d.carb_g) + numField('Fat (g)', 'deFat', d.fat_g) + numField('Fiber (g)', 'deFiber', d.fiber_g) + '</div>' +
-    '<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:15px"><input type="checkbox" id="dePinned"' + (d.pinned ? ' checked' : '') + ' style="width:20px;height:20px;flex:none"><span>Keep near the top</span></label>' +
+    '<label style="display:flex;align-items:center;gap:10px;padding:9px 2px;font-size:15px"><input type="checkbox" id="dePinned"' + (d.pinned ? ' checked' : '') + ' style="width:20px;height:20px;flex:none"><span>&#128204; Frequent (keeps it near the top)</span></label>' +
     '<div class="import-status" id="deStatus"></div>' +
     '<button class="sheet-btn" onclick="saveDishEdit()">' + (dishEditId ? 'Save changes' : 'Add to my list') + '</button>' +
     (dishEditId ? '<button class="sheet-btn secondary" onclick="removeDish()">Remove from my list</button>' : '') +
