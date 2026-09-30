@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sanctuary-v10';
+const CACHE_NAME = 'sanctuary-v11';
 const URLS_TO_CACHE = [
   './',
   './index.html',

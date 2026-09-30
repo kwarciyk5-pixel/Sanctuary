@@ -566,6 +566,18 @@ input, textarea, select { font-family: var(--font); }
 .task-act.delete { background: var(--peach-deep); }
 .task-priority.high { background: var(--peach-deep); }
 .task-priority.medium { background: var(--yellow-deep); }
+/* Batch R: tasks */
+.task-categories { padding-top: 8px; padding-right: 8px; }
+.task-priority.high { background: #F0443A; }
+.task-priority.medium { background: #FFD60A; }
+.task-meta-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-tools { display: flex; justify-content: flex-end; margin: -6px 0 10px; }
+.task-toggle { display: flex; align-items: center; gap: 8px; min-height: 32px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; }
+.task-toggle input { -webkit-appearance: none; appearance: none; width: 34px; height: 20px; border-radius: 10px; background: rgba(45,43,61,0.15); position: relative; margin: 0; cursor: pointer; transition: background 0.2s ease; flex: none; }
+.task-toggle input::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm); transition: left 0.2s ease; }
+.task-toggle input:checked { background: var(--lavender-deep); }
+.task-toggle input:checked::after { left: 16px; }
+.task-clear-btn { font-size: 12px; font-weight: 700; color: var(--lavender-deep); background: none; padding: 4px 0 12px; }
 
 /* ============================================
    LISTS TAB
@@ -1241,6 +1253,7 @@ select.sheet-input { appearance: none; }
         <button class="task-cat-pill" onclick="filterTasks('social', this)">Social</button>
         <button class="task-cat-pill" onclick="filterTasks('groceries', this)">Groceries</button>
       </div>
+      <div class="task-tools"><label class="task-toggle"><span>Hide finished</span><input type="checkbox" id="hideDoneToggle" onchange="toggleHideDone(this.checked)"></label></div>
 
       <div id="taskList">
         <div class="empty-state">
@@ -1426,7 +1439,14 @@ select.sheet-input { appearance: none; }
   <div class="sheet-field"><label class="sheet-label">Task</label><input class="sheet-input" id="editTaskText"></div>
   <div class="sheet-field"><label class="sheet-label">Category</label><select class="sheet-input" id="editTaskCat"><option value="home">Home & Life</option><option value="work">Work</option><option value="trading">Trading</option><option value="health">Health</option><option value="social">Social</option><option value="groceries">Groceries</option></select></div>
   <div class="sheet-field"><label class="sheet-label">Priority</label><select class="sheet-input" id="editTaskPriority"><option value="none">None</option><option value="medium">Medium</option><option value="high">High</option></select></div>
-  <div class="sheet-field"><label class="sheet-label">Deadline (optional)</label><input class="sheet-input" id="editTaskDeadline" placeholder="e.g. Fri or 2026-08-10"></div>
+  <div class="sheet-label" style="margin-bottom:6px">Deadline (optional)</div>
+  <div style="display:flex;gap:8px">
+    <div class="sheet-field" style="flex:1;min-width:0;margin-bottom:4px"><input class="sheet-input" id="editTaskDueDate" type="date" aria-label="Deadline date"></div>
+    <div class="sheet-field" style="flex:1;min-width:0;margin-bottom:4px"><input class="sheet-input" id="editTaskDueTime" type="time" aria-label="Deadline time (optional)"></div>
+  </div>
+  <div id="editTaskOldDl" style="font-size:12px;color:var(--text-muted);margin-bottom:4px;display:none"></div>
+  <button type="button" class="task-clear-btn" onclick="clearTaskDeadline()">Remove deadline</button>
+  <div class="sheet-field"><label class="sheet-label" for="editTaskNote">Notes (optional)</label><textarea class="sheet-input" id="editTaskNote" rows="3" placeholder="anything to remember"></textarea></div>
   <button class="sheet-btn" onclick="saveTaskEdit()">Save</button>
   <button class="sheet-btn secondary" onclick="closeTaskEdit()">Cancel</button>
 </div>
@@ -1993,10 +2013,18 @@ function fmtHM(mins) {
 function renderTasks() {
   const container = document.getElementById('taskList');
   const tasks = appData.tasks || [];
-  const filtered = currentTaskFilter === 'all' ? tasks : tasks.filter(t => t.category === currentTaskFilter);
+  const hideDone = !!(appData.settings && appData.settings.hide_done_tasks);
+  const hdt = document.getElementById('hideDoneToggle');
+  if (hdt) hdt.checked = hideDone;
+  let filtered = currentTaskFilter === 'all' ? tasks : tasks.filter(t => t.category === currentTaskFilter);
+  const doneHidden = hideDone ? filtered.filter(t => t.completed).length : 0;
+  if (hideDone) filtered = filtered.filter(t => !t.completed);
 
   if (filtered.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-emoji">&#9997;&#65039;</div><div>No tasks yet. Tap + to add one.</div></div>';
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-emoji">&#9997;&#65039;</div><div>' +
+      (doneHidden ? 'All done here. ' + doneHidden + ' finished task' + (doneHidden === 1 ? ' is' : 's are') + ' hidden.' : 'No tasks yet. Tap + to add one.') +
+      '</div></div>';
+    updateTaskBadges();
     return;
   }
 
@@ -2012,8 +2040,8 @@ function renderTasks() {
     if (task.completed) {
       html += '<div class="task-item completed">';
       html += '<div class="task-checkbox checked" onclick="toggleTask(' + realIdx + ')"></div>';
-      html += '<div style="flex:1"><div class="task-text">' + escapeHtml(task.text) + '</div>';
-      if (task.deadline) html += '<div class="task-meta">' + escapeHtml(task.deadline) + '</div>';
+      html += '<div style="flex:1;min-width:0"><div class="task-text">' + escapeHtml(task.text) + '</div>';
+      html += taskMetaHtml(task);
       html += '</div>';
       if (task.priority === 'high') html += '<div class="task-priority high"></div>';
       else if (task.priority === 'medium') html += '<div class="task-priority medium"></div>';
@@ -2026,8 +2054,8 @@ function renderTasks() {
       html += '</div>';
       html += '<div class="task-item swipeable" ontouchstart="taskTouchStart(event,this)" ontouchmove="taskTouchMove(event)" ontouchend="taskTouchEnd(event)">';
       html += '<div class="task-checkbox" onclick="toggleTask(' + realIdx + ')"></div>';
-      html += '<div style="flex:1"><div class="task-text">' + escapeHtml(task.text) + '</div>';
-      if (task.deadline) html += '<div class="task-meta">' + escapeHtml(task.deadline) + '</div>';
+      html += '<div style="flex:1;min-width:0"><div class="task-text">' + escapeHtml(task.text) + '</div>';
+      html += taskMetaHtml(task);
       html += '</div>';
       if (task.priority === 'high') html += '<div class="task-priority high"></div>';
       else if (task.priority === 'medium') html += '<div class="task-priority medium"></div>';
@@ -2099,7 +2127,14 @@ function openTaskEdit(idx) {
   document.getElementById('editTaskText').value = t.text || '';
   document.getElementById('editTaskCat').value = t.category || 'home';
   document.getElementById('editTaskPriority').value = t.priority || 'none';
-  document.getElementById('editTaskDeadline').value = t.deadline || '';
+  var dp = taskDueParts(t.deadline);
+  document.getElementById('editTaskDueDate').value = dp ? dp.date : '';
+  document.getElementById('editTaskDueTime').value = dp ? dp.time : '';
+  _editTaskLegacyDl = (!dp && t.deadline) ? String(t.deadline) : null;
+  var oldDl = document.getElementById('editTaskOldDl');
+  oldDl.style.display = _editTaskLegacyDl ? 'block' : 'none';
+  oldDl.textContent = _editTaskLegacyDl ? 'Current deadline: "' + _editTaskLegacyDl + '". Pick a date to replace it, or tap Remove deadline.' : '';
+  document.getElementById('editTaskNote').value = t.note || '';
   document.getElementById('taskEditOverlay').classList.add('visible');
   document.getElementById('taskEditSheet').classList.add('visible');
 }
@@ -2117,8 +2152,13 @@ function saveTaskEdit() {
   t.text = txt;
   t.category = document.getElementById('editTaskCat').value;
   t.priority = document.getElementById('editTaskPriority').value;
-  var dl = document.getElementById('editTaskDeadline').value.trim();
-  t.deadline = dl || null;
+  var dd = document.getElementById('editTaskDueDate').value;
+  var dtm = document.getElementById('editTaskDueTime').value;
+  if (!dd && dtm) dd = todayStr();
+  if (dd) t.deadline = dd + (dtm ? 'T' + dtm : '');
+  else t.deadline = _editTaskLegacyDl || null;
+  var nt = document.getElementById('editTaskNote').value.trim();
+  t.note = nt || null;
   saveData();
   closeTaskEdit();
   renderTasks();
@@ -2141,8 +2181,48 @@ function filterTasks(cat, btn) {
   renderTasks();
 }
 
+var _editTaskLegacyDl = null;
+
+// Deadline is stored as 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM'. Older free-text deadlines are shown as typed.
+function taskDueParts(dl) {
+  var m = /^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}))?$/.exec(String(dl || '').trim());
+  return m ? { date: m[1], time: m[2] || '' } : null;
+}
+
+function taskDueText(dl) {
+  var p = taskDueParts(dl);
+  if (!p) return String(dl || '');
+  var d = new Date(p.date + 'T00:00:00');
+  if (isNaN(d.getTime())) return String(dl);
+  var wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+  var mo = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
+  return wd + ' ' + d.getDate() + ' ' + mo + (p.time ? ', ' + p.time : '');
+}
+
+function taskMetaHtml(task) {
+  var parts = [];
+  if (task.deadline) parts.push('&#128197; ' + escapeHtml(taskDueText(task.deadline)));
+  if (task.note) parts.push('&#128221; ' + escapeHtml(task.note));
+  return parts.length ? '<div class="task-meta task-meta-line">' + parts.join(' &middot; ') + '</div>' : '';
+}
+
+function clearTaskDeadline() {
+  document.getElementById('editTaskDueDate').value = '';
+  document.getElementById('editTaskDueTime').value = '';
+  _editTaskLegacyDl = null;
+  var o = document.getElementById('editTaskOldDl');
+  if (o) { o.style.display = 'none'; o.textContent = ''; }
+}
+
+function toggleHideDone(on) {
+  if (!appData.settings) appData.settings = {};
+  appData.settings.hide_done_tasks = !!on;
+  saveData();
+  renderTasks();
+}
+
 function updateTaskBadges() {
-  const cats = ['all', 'trading', 'home', 'health', 'social', 'groceries'];
+  const cats = ['all', 'trading', 'work', 'home', 'health', 'social', 'groceries'];
   const pills = document.querySelectorAll('.task-cat-pill');
   const tasks = appData.tasks || [];
   pills.forEach(function(pill, i) {
@@ -2208,7 +2288,7 @@ function renderDishes() {
   let html = '';
   dishes.forEach(dish => {
     html += '<div class="dish-card" data-id="' + escapeAttr(dish.id || '') + '" onclick="if (this.dataset.id) openDishEdit(this.dataset.id)" style="cursor:pointer">';
-    html += '<div class="dish-emoji">' + (dish.emoji || '&#127835;') + '</div>';
+    html += '<div class="dish-emoji">' + dishEmoji(dish) + '</div>';
     html += '<div class="dish-info">';
     html += '<div class="dish-name">' + escapeHtml(dish.name) + '</div>';
     html += '<div class="dish-meta">' + (dish.cuisine || '') + (dish.cook ? ' \u00b7 ' + cookLabel(dish.cook) : '') + (dish.calories ? ' \u00b7 ~' + dish.calories + ' cal' : '') + '</div>';
@@ -2710,6 +2790,12 @@ function openAddSheet() {
       '<div class="sheet-field"><label class="sheet-label">Task</label><input class="sheet-input" id="newTaskText" placeholder="What needs doing?"></div>' +
       '<div class="sheet-field"><label class="sheet-label">Category</label><select class="sheet-input" id="newTaskCat"><option value="home">Home & Life</option><option value="work">Work</option><option value="trading">Trading</option><option value="health">Health</option><option value="social">Social</option><option value="groceries">Groceries</option></select></div>' +
       '<div class="sheet-field"><label class="sheet-label">Priority</label><select class="sheet-input" id="newTaskPriority"><option value="none">None</option><option value="medium">Medium</option><option value="high">High</option></select></div>' +
+      '<div class="sheet-label" style="margin-bottom:6px">Deadline (optional)</div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<div class="sheet-field" style="flex:1;min-width:0"><input class="sheet-input" id="newTaskDueDate" type="date" aria-label="Deadline date"></div>' +
+        '<div class="sheet-field" style="flex:1;min-width:0"><input class="sheet-input" id="newTaskDueTime" type="time" aria-label="Deadline time (optional)"></div>' +
+      '</div>' +
+      '<div class="sheet-field"><label class="sheet-label" for="newTaskNote">Notes (optional)</label><textarea class="sheet-input" id="newTaskNote" rows="2" placeholder="anything to remember"></textarea></div>' +
       '<button class="sheet-btn" onclick="submitNewTask()">Add Task</button>' +
       '<button class="sheet-btn secondary" onclick="closeAddSheet()">Cancel</button>';
   } else if (currentTab === 'lists') {
@@ -2717,7 +2803,7 @@ function openAddSheet() {
       title.textContent = '\u2795 Add Dish';
       content.innerHTML =
         '<div class="sheet-field"><label class="sheet-label">Dish Name</label><input class="sheet-input" id="newDishName" placeholder="e.g. Pad kaprao muu"></div>' +
-        '<div class="sheet-field"><label class="sheet-label">Cuisine</label><select class="sheet-input" id="newDishCuisine"><option value="Thai">Thai</option><option value="Burmese">Burmese</option><option value="Korean">Korean</option><option value="Japanese">Japanese</option><option value="Western">Western</option><option value="Snack">Snack</option><option value="Other">Other</option></select></div>' +
+        '<div class="sheet-field"><label class="sheet-label">Cuisine</label><select class="sheet-input" id="newDishCuisine">' + cuisineOptionsHtml('Thai') + '</select></div>' +
         '<div class="sheet-field"><label class="sheet-label">Who Cooks</label><select class="sheet-input" id="newDishCook">' + cookOptionsHtml('hubby') + '</select></div>' +
         '<div class="sheet-field"><label class="sheet-label">Rating (1-5)</label><input class="sheet-input" id="newDishRating" type="number" min="1" max="5" placeholder="5"></div>' +
         '<div class="sheet-field"><label class="sheet-label">Est. Calories</label><input class="sheet-input" id="newDishCal" type="number" placeholder="optional"></div>' +
@@ -2757,7 +2843,12 @@ function closeAddSheet() {
 function submitNewTask() {
   const text = document.getElementById('newTaskText').value.trim();
   if (!text) return;
-  addTask(text, document.getElementById('newTaskCat').value, document.getElementById('newTaskPriority').value);
+  var dd = valOrEmpty('newTaskDueDate');
+  var dtm = valOrEmpty('newTaskDueTime');
+  if (!dd && dtm) dd = todayStr();
+  addTask(text, document.getElementById('newTaskCat').value, document.getElementById('newTaskPriority').value, dd ? dd + (dtm ? 'T' + dtm : '') : null);
+  var nt = valOrEmpty('newTaskNote');
+  if (nt && appData.tasks.length) { appData.tasks[appData.tasks.length - 1].note = nt; saveData(); renderTasks(); }
   closeAddSheet();
 }
 
@@ -3966,7 +4057,7 @@ function renderMealPickList() {
       html += '<div class="mp-row' + (qn ? ' on' : '') + '">';
       html += '<div class="mp-main" data-id="' + did + '" onclick="mpToggle(this.dataset.id)">';
       html += '<div class="mp-box">' + (qn ? '&#10003;' : '') + '</div>';
-      html += '<div style="min-width:0"><div class="mp-name">' + (d.pinned ? '&#128204; ' : '') + escapeHtml(d.name) + '</div>';
+      html += '<div style="min-width:0"><div class="mp-name">' + (d.pinned ? '&#128204; ' : '') + dishEmoji(d) + ' ' + escapeHtml(d.name) + '</div>';
       if (meta) html += '<div class="mp-meta">' + meta + '</div>';
       html += '</div></div>';
       if (qn) {
@@ -4034,8 +4125,19 @@ function cookOptionsHtml(sel) {
   return html;
 }
 
+// Emoji per dish: by cuisine; Other/blank falls back to who cooks (Ready Made, Take out).
+function dishEmoji(d) {
+  var byCuisine = { Thai: '&#127836;', Burmese: '&#127835;', Korean: '&#129368;', Japanese: '&#127843;', Western: '&#127828;', Snack: '&#127850;', Drink: '&#9749;', Dessert: '&#127856;' };
+  var c = d && d.cuisine;
+  if (c && byCuisine[c]) return byCuisine[c];
+  var cook = d && d.cook;
+  if (cook === 'ready_made') return '&#129387;';
+  if (cook === 'restaurant') return '&#129377;';
+  return '&#127869;&#65039;';
+}
+
 function cuisineOptionsHtml(sel) {
-  var c = ['Thai', 'Burmese', 'Korean', 'Japanese', 'Western', 'Snack', 'Other'];
+  var c = ['Thai', 'Burmese', 'Korean', 'Japanese', 'Western', 'Snack', 'Drink', 'Dessert', 'Other'];
   var html = sel ? '' : '<option value="">--</option>';
   if (sel && c.indexOf(sel) < 0) html += '<option value="' + escapeAttr(sel) + '" selected>' + escapeHtml(sel) + '</option>';
   c.forEach(function (x) { html += '<option value="' + x + '"' + (x === sel ? ' selected' : '') + '>' + x + '</option>'; });
