@@ -1028,6 +1028,43 @@ select.sheet-input { appearance: none; }
 .hg-compact .hg-cell { border-radius: 50%; max-width: 7px; }
 .hg-compact .hg-cells { gap: 2px; }
 .hg-toggle { align-self: flex-end; font-size: 10px; opacity: .5; padding: 2px 4px; cursor: pointer; }
+/* Batch S: smaller Home date header */
+.date-header { padding: 0 0 10px; }
+.date-header-day { font-size: 11px; }
+.date-header-date { font-size: 20px; margin-top: 0; }
+/* Batch S: stats charts */
+.mini-bar-chart { position: relative; height: 64px; gap: 4px; }
+.mini-bar { border-radius: 4px 4px 1px 1px; }
+.mini-bar.today { box-shadow: 0 0 0 2px var(--yellow-deep); }
+.mini-avg-line { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed rgba(45,43,61,0.28); pointer-events: none; }
+.mini-bar-labels { display: flex; gap: 4px; margin-top: 5px; }
+.mini-bar-labels span { flex: 1; min-width: 0; text-align: center; font-size: 9px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.mini-bar-labels span.today { color: var(--text-primary); font-weight: 700; }
+.food-chips { display: flex; gap: 6px; margin: 0 0 10px; }
+.food-chip { padding: 7px 12px; border-radius: var(--radius-full); font-size: 12px; font-weight: 700; background: var(--bg); color: var(--text-secondary); }
+.food-chip.active { background: linear-gradient(135deg, var(--lavender), var(--lavender-deep)); color: #fff; }
+.food-pane { display: none; }
+.food-pane.active { display: block; }
+.food-pane .stat-module-value { text-align: right; margin-bottom: 6px; }
+/* Batch S: habits card */
+.hg-label { flex: 0 0 104px; font-size: 12px; opacity: .85; text-align: left; cursor: pointer; }
+.hg-count { flex: 0 0 34px; font-size: 10px; font-weight: 700; color: var(--text-secondary); text-align: right; }
+.hg-wrap:not(.hg-compact) .hg-cell { border-radius: 6px; max-width: 24px; }
+.hg-cell.hg-today { box-shadow: 0 0 0 2px var(--yellow-deep); }
+/* Batch S: habit month sheet */
+.hm-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.hm-nav button { width: 44px; height: 40px; border-radius: 12px; background: var(--bg); font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.hm-nav button:disabled { opacity: .3; }
+.hm-sum { display: flex; gap: 8px; margin-bottom: 14px; }
+.hm-sum div { flex: 1; background: var(--bg); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.hm-sum b { display: block; font-size: 18px; color: var(--text-primary); }
+.hm-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.hm-head { font-size: 10px; font-weight: 700; color: var(--text-muted); text-align: center; }
+.hm-day { aspect-ratio: 1; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; background: var(--bg); color: var(--text-secondary); }
+.hm-day.hm-done { background: #7a58c9; color: #fff; }
+.hm-day.hm-na, .hm-day.hm-future { opacity: .35; }
+.hm-day.hm-today { box-shadow: 0 0 0 2px var(--yellow-deep); }
+.hm-day.hm-blank { background: none; }
 
 /* --- dz: danger zone (Clear all data) --- */
 .dz-section {
@@ -1194,26 +1231,25 @@ select.sheet-input { appearance: none; }
 
         <div class="stat-module">
           <div class="stat-module-header">
-            <div class="stat-module-title">&#128293; Calories</div>
+            <div class="stat-module-title">&#127860; Food</div>
+          </div>
+          <div class="food-chips">
+            <button class="food-chip active" onclick="setFoodPane('foodPaneCal', this)">Calories</button>
+            <button class="food-chip" onclick="setFoodPane('foodPaneProtein', this)">Protein</button>
+            <button class="food-chip" onclick="setFoodPane('foodPaneSodium', this)">Sodium</button>
+          </div>
+          <div class="food-pane active" id="foodPaneCal">
             <div class="stat-module-value" id="statsCalAvg">-- avg</div>
+            <div class="mini-bar-chart" id="statsCalBars"></div>
           </div>
-          <div class="mini-bar-chart" id="statsCalBars"></div>
-        </div>
-
-        <div class="stat-module">
-          <div class="stat-module-header">
-            <div class="stat-module-title">&#127831; Protein</div>
+          <div class="food-pane" id="foodPaneProtein">
             <div class="stat-module-value" id="statsProteinAvg">-- avg</div>
+            <div class="mini-bar-chart" id="statsProteinBars"></div>
           </div>
-          <div class="mini-bar-chart" id="statsProteinBars"></div>
-        </div>
-
-        <div class="stat-module">
-          <div class="stat-module-header">
-            <div class="stat-module-title">&#129482; Sodium</div>
+          <div class="food-pane" id="foodPaneSodium">
             <div class="stat-module-value" id="statsSodiumAvg">-- avg</div>
+            <div class="mini-bar-chart" id="statsSodiumBars"></div>
           </div>
-          <div class="mini-bar-chart" id="statsSodiumBars"></div>
         </div>
 
         <div class="stat-module">
@@ -1224,7 +1260,7 @@ select.sheet-input { appearance: none; }
           <div id="statsHabitsGrid" class="habits-grid"></div>
         </div>
 
-        <div class="stat-module">
+        <div class="stat-module" style="display:none">
           <div class="stat-module-header">
             <div class="stat-module-title">&#128138; Medicine</div>
             <div class="stat-module-value" id="statsMedRate">--%</div>
@@ -1400,6 +1436,14 @@ select.sheet-input { appearance: none; }
   <div class="import-status" id="importStatus"></div>
   <button class="sheet-btn" onclick="importData()">Import & Merge</button>
   <button class="sheet-btn secondary" onclick="closeImportSheet()">Cancel</button>
+</div>
+
+<!-- ===================== HABIT MONTH SHEET ===================== -->
+<div class="sheet-overlay" id="habitMonthOverlay" onclick="closeHabitMonth()"></div>
+<div class="bottom-sheet" id="habitMonthSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="habitMonthTitle">Habit</div>
+  <div id="habitMonthBody"></div>
 </div>
 
 <!-- ===================== LOG MEAL SHEETS ===================== -->
@@ -1936,11 +1980,12 @@ function renderMiniBars(containerId, dates, valueFn, maxVal, color, avgId, avgSu
     if (val > 0) { total += val; count++; }
     const pct = Math.min(val / maxVal * 100, 100);
     const bar = document.createElement('div');
-    bar.className = 'mini-bar';
+    bar.className = 'mini-bar' + (d === todayStr() ? ' today' : '');
     bar.style.height = Math.max(pct, 4) + '%';
     bar.style.background = val > 0 ? color : 'rgba(45,43,61,0.06)';
     container.appendChild(bar);
   });
+  miniBarExtras(container, dates, total, count, maxVal, isPercent);
 
   if (avgId) {
     const avg = count > 0 ? Math.round(total / count) : 0;
@@ -4618,15 +4663,120 @@ function hgWeekdayLetter(dateKey) {
 }
 
 function hgRowHtml(row, dateKeys, compact) {
+  var idx = HG_ROWS.length;
+  HG_ROWS.push(row);
+  var t = todayStr();
+  var done = 0, possible = 0;
   var h = '<div class="hg-row">';
-  h += '<div class="hg-label">' + escapeHtml(row.label) + '</div>';
+  h += '<div class="hg-label" role="button" tabindex="0" onclick="openHabitMonth(' + idx + ')">' + escapeHtml(row.label) + '</div>';
   h += '<div class="hg-cells">';
   for (var i = 0; i < dateKeys.length; i++) {
     var st = hgCellState(row, dateKeys[i]);
-    h += '<div class="hg-cell hg-' + st + (compact ? ' hg-dot' : '') + '"></div>';
+    if (st !== 'na' && dateKeys[i] <= t) { possible++; if (st === 'done') done++; }
+    h += '<div class="hg-cell hg-' + st + (compact ? ' hg-dot' : '') + (dateKeys[i] === t ? ' hg-today' : '') + '"></div>';
   }
-  h += '</div></div>';
+  h += '</div><div class="hg-count">' + (possible ? done + '/' + possible : '') + '</div></div>';
   return h;
+}
+
+/* ===== Batch S: stats extras + habit month view ===== */
+var HG_ROWS = [];
+var habitMonthRow = null;
+var habitMonthCursor = null;
+
+function miniBarExtras(container, dates, total, count, maxVal, isPercent) {
+  if (!isPercent && count > 0 && maxVal > 0) {
+    var line = document.createElement('div');
+    line.className = 'mini-avg-line';
+    line.style.bottom = Math.min(total / count / maxVal * 100, 100) + '%';
+    container.appendChild(line);
+  }
+  var lab = container.nextElementSibling;
+  if (!lab || !lab.classList || !lab.classList.contains('mini-bar-labels')) {
+    lab = document.createElement('div');
+    lab.className = 'mini-bar-labels';
+    container.parentNode.insertBefore(lab, container.nextSibling);
+  }
+  var t = todayStr();
+  var n = dates.length;
+  var html = '';
+  dates.forEach(function (d, i) {
+    var txt = '';
+    if (n <= 10) txt = hgWeekdayLetter(d);
+    else if (i % 7 === 0 || i === n - 1) txt = String(Number(String(d).slice(8, 10)));
+    html += '<span' + (d === t ? ' class="today"' : '') + '>' + txt + '</span>';
+  });
+  lab.innerHTML = html;
+}
+
+function setFoodPane(id, btn) {
+  document.querySelectorAll('.food-pane').forEach(function (p) { p.classList.toggle('active', p.id === id); });
+  document.querySelectorAll('.food-chip').forEach(function (b) { b.classList.toggle('active', b === btn); });
+}
+
+function openHabitMonth(idx) {
+  var row = HG_ROWS[idx];
+  if (!row) return;
+  habitMonthRow = row;
+  habitMonthCursor = todayStr().slice(0, 7);
+  renderHabitMonth();
+  document.getElementById('habitMonthOverlay').classList.add('visible');
+  document.getElementById('habitMonthSheet').classList.add('visible');
+}
+
+function closeHabitMonth() {
+  document.getElementById('habitMonthOverlay').classList.remove('visible');
+  document.getElementById('habitMonthSheet').classList.remove('visible');
+}
+
+function habitMonthShift(delta) {
+  var p = habitMonthCursor.split('-');
+  var nk = fmtDateKey(new Date(Number(p[0]), Number(p[1]) - 1 + delta, 1)).slice(0, 7);
+  if (nk > todayStr().slice(0, 7)) return;
+  habitMonthCursor = nk;
+  renderHabitMonth();
+}
+
+function renderHabitMonth() {
+  var row = habitMonthRow;
+  if (!row) return;
+  var p = habitMonthCursor.split('-');
+  var y = Number(p[0]), m = Number(p[1]) - 1;
+  var daysIn = new Date(y, m + 1, 0).getDate();
+  var lead = (new Date(y, m, 1).getDay() + 6) % 7;
+  var t = todayStr();
+  var done = 0, possible = 0;
+  var grid = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(function (x) { return '<div class="hm-head">' + x + '</div>'; }).join('');
+  for (var i = 0; i < lead; i++) grid += '<div class="hm-day hm-blank"></div>';
+  for (var d = 1; d <= daysIn; d++) {
+    var key = fmtDateKey(new Date(y, m, d));
+    var cls = 'hm-day';
+    if (key > t) cls += ' hm-future';
+    else {
+      var st = hgCellState(row, key);
+      if (st === 'na') cls += ' hm-na';
+      else { possible++; if (st === 'done') { done++; cls += ' hm-done'; } }
+    }
+    if (key === t) cls += ' hm-today';
+    grid += '<div class="' + cls + '">' + d + '</div>';
+  }
+  var wk = 0, wkPossible = 0;
+  for (var k = 0; k < 7; k++) {
+    var dk = fmtDateKey(new Date(Date.now() - k * 86400000));
+    var s2 = hgCellState(row, dk);
+    if (s2 !== 'na') { wkPossible++; if (s2 === 'done') wk++; }
+  }
+  var monthName = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m];
+  var isThisMonth = habitMonthCursor >= t.slice(0, 7);
+  document.getElementById('habitMonthTitle').textContent = row.label;
+  document.getElementById('habitMonthBody').innerHTML =
+    '<div class="hm-nav"><button aria-label="Previous month" onclick="habitMonthShift(-1)">&lsaquo;</button>' +
+      '<div style="font-size:15px;font-weight:700">' + monthName + ' ' + y + '</div>' +
+      '<button aria-label="Next month" onclick="habitMonthShift(1)"' + (isThisMonth ? ' disabled' : '') + '>&rsaquo;</button></div>' +
+    '<div class="hm-sum"><div><b>' + done + ' of ' + possible + '</b>days in ' + monthName.slice(0, 3) + '</div>' +
+      '<div><b>' + wk + ' of ' + wkPossible + '</b>last 7 days</div></div>' +
+    '<div class="hm-grid">' + grid + '</div>' +
+    '<button class="sheet-btn secondary" style="margin-top:16px" onclick="closeHabitMonth()">Close</button>';
 }
 
 function renderHabitsGrid() {
@@ -4639,6 +4789,7 @@ function renderHabitsGrid() {
   for (var i = 0; i < raw.length; i++) dateKeys.push(hgKey(raw[i]));
   if (!dateKeys.length) { el.innerHTML = ''; return; }
 
+  HG_ROWS = [];
   var compact = dateKeys.length > 10;
   var html = '<div class="hg-wrap' + (compact ? ' hg-compact' : '') + '">';
 
@@ -4647,7 +4798,7 @@ function renderHabitsGrid() {
     for (var j = 0; j < dateKeys.length; j++) {
       html += '<div class="hg-cell hg-daylabel">' + hgWeekdayLetter(dateKeys[j]) + '</div>';
     }
-    html += '</div></div>';
+    html += '</div><div class="hg-count"></div></div>';
   }
 
   var core = hgCoreRows();
