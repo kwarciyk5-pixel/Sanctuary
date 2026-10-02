@@ -3443,6 +3443,12 @@ function openEntryDetail(dateKey, id) {
       '<div class="sheet-field"><label class="sheet-label">Start</label><input class="sheet-input" id="dtStart" type="time" value="' + escapeAttr(entry.start || entry.time || '') + '"></div>' +
       '<div class="sheet-field"><label class="sheet-label">End</label><input class="sheet-input" id="dtEnd" type="time" value="' + escapeAttr(entry.end || '') + '"></div>' +
       '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
+  } else if ((entry.tags || []).indexOf('sleep') >= 0) {
+    const _sl = day.sleep || {};
+    html =
+      '<div class="sheet-field"><label class="sheet-label">Bedtime</label><input class="sheet-input" id="dtTime" type="time" value="' + escapeAttr(_sl.bedtime || entry.time || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Wake time</label><input class="sheet-input" id="dtEnd" type="time" value="' + escapeAttr(_sl.waketime || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
   } else if (hasRange) {
     html =
       '<div class="sheet-field"><label class="sheet-label">Text</label><input class="sheet-input" id="dtText" value="' + escapeAttr(entry.text || '') + '"></div>' +
@@ -3473,8 +3479,8 @@ function openEntryDetail(dateKey, id) {
   }
   html +=
     '<button class="sheet-btn" onclick="saveEntryDetail()">Save</button>' +
-    '<button class="sheet-btn secondary" onclick="deleteEntryDetail()">Delete entry</button>' +
-    '<button class="sheet-btn secondary" onclick="closeDetail()">Cancel</button>';
+    '<button class="sheet-btn secondary" onclick="closeDetail()">Cancel</button>' +
+    '<button class="sheet-btn secondary" style="margin-top:28px;color:#c0392b" onclick="deleteEntryDetail()">Delete entry</button>';
   c.innerHTML = html;
   document.getElementById('detailOverlay').classList.add('visible');
   document.getElementById('detailSheet').classList.add('visible');
@@ -3533,6 +3539,21 @@ function saveEntryDetail() {
     saveData(); renderHome(); renderStats(); closeDetail();
     return;
   }
+  if ((entry.tags || []).indexOf('sleep') >= 0) {
+    const sBed = valOrEmpty('dtTime');
+    const sWake = valOrEmpty('dtEnd');
+    if (!sBed && !sWake) return;
+    if (!day.sleep) day.sleep = {};
+    if (sBed) day.sleep.bedtime = sBed;
+    if (sWake) day.sleep.waketime = sWake;
+    const b = day.sleep.bedtime, w = day.sleep.waketime;
+    entry.text = (b && w) ? ('Sleep ' + b + '-' + w) : (b ? ('Sleep ' + b) : ('Woke ' + w));
+    entry.time = b || w;
+    entry.note = valOrEmpty('dtNote') || null;
+    delete entry.start; delete entry.end; delete entry.minutes;
+    saveData(); renderHome(); renderStats(); closeDetail();
+    return;
+  }
   entry.text = valOrEmpty('dtText');
   entry.time = valOrEmpty('dtTime');
   entry.note = valOrEmpty('dtNote') || null;
@@ -3566,6 +3587,8 @@ function deleteEntryDetail() {
   if (!detailContext) return;
   const day = appData.days[detailContext.dateKey];
   if (!day) return;
+  const _delE = (day.entries || []).find(e => e.id === detailContext.id);
+  if (!confirm('Delete "' + (_delE && _delE.text ? _delE.text : 'this entry') + '"?\n\nThis cannot be undone.')) return;
   if (day.entries) day.entries = day.entries.filter(e => e.id !== detailContext.id);
   if (day.meals) day.meals = day.meals.filter(m => m.id !== detailContext.id);
   saveData(); renderHome(); renderStats(); closeDetail();
