@@ -3443,6 +3443,12 @@ function openEntryDetail(dateKey, id) {
       '<div class="sheet-field"><label class="sheet-label">Start</label><input class="sheet-input" id="dtStart" type="time" value="' + escapeAttr(entry.start || entry.time || '') + '"></div>' +
       '<div class="sheet-field"><label class="sheet-label">End</label><input class="sheet-input" id="dtEnd" type="time" value="' + escapeAttr(entry.end || '') + '"></div>' +
       '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
+  } else if ((entry.tags || []).indexOf('water') >= 0) {
+    const _ml = (typeof entry.ml === 'number') ? entry.ml : (parseInt(((entry.text || '').match(/\d+/) || [''])[0], 10) || '');
+    html =
+      '<div class="sheet-field"><label class="sheet-label">Amount (ml)</label><input class="sheet-input" id="dtMl" type="number" inputmode="numeric" value="' + escapeAttr(_ml) + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Time</label><input class="sheet-input" id="dtTime" type="time" value="' + escapeAttr(entry.time || '') + '"></div>' +
+      '<div class="sheet-field"><label class="sheet-label">Note</label><input class="sheet-input" id="dtNote" value="' + escapeAttr(entry.note || '') + '"></div>';
   } else if ((entry.tags || []).indexOf('sleep') >= 0) {
     const _sl = day.sleep || {};
     html =
@@ -3539,6 +3545,19 @@ function saveEntryDetail() {
     saveData(); renderHome(); renderStats(); closeDetail();
     return;
   }
+  if ((entry.tags || []).indexOf('water') >= 0) {
+    const newMl = numOrNull('dtMl');
+    if (!newMl || newMl <= 0) return;
+    const oldMl = (typeof entry.ml === 'number') ? entry.ml : (parseInt(((entry.text || '').match(/\d+/) || ['0'])[0], 10) || 0);
+    day.water_ml = Math.max(0, (day.water_ml || 0) - oldMl + newMl);
+    entry.ml = newMl;
+    entry.text = '+' + newMl + 'ml water';
+    entry.time = valOrEmpty('dtTime') || entry.time;
+    entry.note = valOrEmpty('dtNote') || null;
+    selectedDate = moveDetailEntryDate();
+    saveData(); renderHome(); renderStats(); closeDetail();
+    return;
+  }
   if ((entry.tags || []).indexOf('sleep') >= 0) {
     const sBed = valOrEmpty('dtTime');
     const sWake = valOrEmpty('dtEnd');
@@ -3589,6 +3608,9 @@ function deleteEntryDetail() {
   if (!day) return;
   const _delE = (day.entries || []).find(e => e.id === detailContext.id);
   if (!confirm('Delete "' + (_delE && _delE.text ? _delE.text : 'this entry') + '"?\n\nThis cannot be undone.')) return;
+  if (_delE && typeof _delE.ml === 'number' && (_delE.tags || []).indexOf('water') >= 0) {
+    day.water_ml = Math.max(0, (day.water_ml || 0) - _delE.ml);
+  }
   if (day.entries) day.entries = day.entries.filter(e => e.id !== detailContext.id);
   if (day.meals) day.meals = day.meals.filter(m => m.id !== detailContext.id);
   saveData(); renderHome(); renderStats(); closeDetail();
