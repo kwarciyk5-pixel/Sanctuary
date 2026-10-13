@@ -4280,18 +4280,14 @@ function renderMealPickList() {
       if (meta) html += '<div class="mp-meta">' + meta + '</div>';
       html += '</div></div>';
       if (qn) {
-        html += '<div class="mp-qty"><button aria-label="Less" data-id="' + did + '" onclick="mpStep(this.dataset.id, -1)">&minus;</button>' +
-          '<span class="mp-count">&times;' + qtyLabel(qn) + '</span>' +
-          '<button aria-label="More" data-id="' + did + '" onclick="mpStep(this.dataset.id, 1)">+</button></div>';
+        html += '<div class="mp-qty">' + qtyPickerHtml(qn, 'data-id="' + did + '" onchange="mpQtyChange(this)"', '') + '</div>';
       }
       html += '<button class="mp-edit" aria-label="Edit ' + escapeAttr(d.name) + '" data-id="' + did + '" onclick="openDishEdit(this.dataset.id)">&#9998;</button>';
       html += '</div>';
     });
     el.innerHTML = html;
   }
-  var n = Object.keys(mealPickSel).length;
-  var btn = document.getElementById('mpLogBtn');
-  if (btn) btn.textContent = n ? 'Log ' + n + (n === 1 ? ' item' : ' items') : 'Log';
+  updateMealPickCount();
 }
 
 function mpToggle(id) {
@@ -4309,6 +4305,60 @@ function qtyLabel(q) {
   if (Math.abs(part) < 0.001) return String(whole);
   for (var i = 0; i < fr.length; i++) { if (Math.abs(part - fr[i][0]) < 0.001) return (whole > 0 ? whole + ' ' : '') + fr[i][1]; }
   return String(Math.round(q * 100) / 100);
+}
+
+// Portion picker: whole number and fraction chosen separately (total = whole + fraction).
+function qtyFracs() { return [[0, '-'], [0.25, '1/4'], [1 / 3, '1/3'], [0.5, '1/2'], [2 / 3, '2/3'], [0.75, '3/4']]; }
+
+function qtyParts(q) {
+  q = (typeof q === 'number' && q > 0) ? q : 0;
+  var whole = Math.floor(q + 0.001);
+  return { whole: whole, frac: Math.max(0, q - whole) };
+}
+
+// Two selects: whole (0-20) and fraction. attrs go on both; idBase (optional) gives ids idBase + 'W' / idBase + 'F'.
+function qtyPickerHtml(q, attrs, idBase) {
+  var p = qtyParts(q);
+  var st = 'style="height:32px;border-radius:10px;background:var(--bg-card);border:1.5px solid var(--lavender-deep);color:var(--text-primary);font-size:16px;font-weight:700;padding:0 2px;text-align:center"';
+  var w = '<select aria-label="Whole" class="qty-w" ' + st.replace('"', '"width:44px;') + ' ' + attrs + (idBase ? ' id="' + idBase + 'W"' : '') + '>';
+  var maxW = Math.max(20, p.whole);
+  for (var i = 0; i <= maxW; i++) w += '<option value="' + i + '"' + (i === p.whole ? ' selected' : '') + '>' + i + '</option>';
+  w += '</select>';
+  var f = '<select aria-label="Fraction" class="qty-f" ' + st.replace('"', '"width:54px;') + ' ' + attrs + (idBase ? ' id="' + idBase + 'F"' : '') + '>';
+  var hit = false;
+  qtyFracs().forEach(function (x) {
+    var sel = Math.abs(x[0] - p.frac) < 0.001;
+    if (sel) hit = true;
+    f += '<option value="' + x[0] + '"' + (sel ? ' selected' : '') + '>' + x[1] + '</option>';
+  });
+  if (!hit) f += '<option value="' + p.frac + '" selected>' + (Math.round(p.frac * 100) / 100) + '</option>';
+  f += '</select>';
+  return w + f;
+}
+
+function qtyFromPicker(box) {
+  if (!box) return NaN;
+  var w = box.querySelector('.qty-w'), f = box.querySelector('.qty-f');
+  if (!w || !f) return NaN;
+  return (parseFloat(w.value) || 0) + (parseFloat(f.value) || 0);
+}
+
+function mpQtyChange(el) {
+  var id = el.dataset.id;
+  var q = qtyFromPicker(el.parentNode);
+  if (!(q > 0)) { mealPickSel[id] = 0; updateMealPickCount(); return; }
+  mealPickSel[id] = q;
+  updateMealPickCount();
+}
+
+function mealPickChosenIds() {
+  return Object.keys(mealPickSel).filter(function (id) { return mealPickSel[id] > 0; });
+}
+
+function updateMealPickCount() {
+  var n = mealPickChosenIds().length;
+  var btn = document.getElementById('mpLogBtn');
+  if (btn) btn.textContent = n ? 'Log ' + n + (n === 1 ? ' item' : ' items') : 'Log';
 }
 
 function mpStep(id, delta) {
@@ -4366,7 +4416,7 @@ function cuisineOptionsHtml(sel) {
 }
 
 function submitMealPick() {
-  var ids = Object.keys(mealPickSel);
+  var ids = mealPickChosenIds();
   var status = document.getElementById('mpStatus');
   if (!ids.length) {
     status.className = 'import-status error';
@@ -4435,19 +4485,11 @@ function mealItemsEditHtml(meal) {
   if (!items.length) return '';
   var html = '<div class="qa-section-label">Portions</div>';
   items.forEach(function (it, i) {
-    var opts = '<option value="0">Remove</option>';
-    var hit = false;
-    qtySteps().forEach(function (q) {
-      var sel = Math.abs(q - it.qty) < 0.001;
-      if (sel) hit = true;
-      opts += '<option value="' + q + '"' + (sel ? ' selected' : '') + '>' + qtyLabel(q) + '</option>';
-    });
-    if (!hit) opts += '<option value="' + it.qty + '" selected>' + qtyLabel(it.qty) + '</option>';
     html += '<div class="sheet-field" style="display:flex;align-items:center;gap:10px">' +
-      '<label class="sheet-label" for="dtQty_' + i + '" style="flex:1;min-width:0;margin:0">' + escapeHtml(it.name) + '</label>' +
-      '<select class="sheet-input" id="dtQty_' + i + '" style="width:96px;flex:none">' + opts + '</select></div>';
+      '<label class="sheet-label" for="dtQty_' + i + 'W" style="flex:1;min-width:0;margin:0">' + escapeHtml(it.name) + '</label>' +
+      '<div id="dtQty_' + i + '" style="display:flex;gap:4px;flex:none">' + qtyPickerHtml(it.qty, '', 'dtQty_' + i) + '</div></div>';
   });
-  html += '<div style="font-size:12px;color:var(--text-muted);margin:-6px 0 10px">Changing a portion recalculates the name and nutrition below.</div>';
+  html += '<div style="font-size:12px;color:var(--text-muted);margin:-6px 0 10px">Pick the whole number and the fraction separately. 0 and - removes the dish. Changing a portion recalculates the name and nutrition below.</div>';
   return html;
 }
 
@@ -4458,7 +4500,7 @@ function applyMealItemEdits(meal, entry) {
   var next = [];
   items.forEach(function (it, i) {
     var el = document.getElementById('dtQty_' + i);
-    var q = el ? parseFloat(el.value) : it.qty;
+    var q = el ? qtyFromPicker(el) : it.qty;
     if (isNaN(q)) q = it.qty;
     if (Math.abs(q - it.qty) > 0.0001) changed = true;
     if (q > 0) next.push({ dish_id: it.dish_id, name: it.name, qty: q, qty_label: qtyLabel(q), unit: it.unit });
