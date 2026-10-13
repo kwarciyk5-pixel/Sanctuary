@@ -1138,6 +1138,8 @@ select.sheet-input { appearance: none; }
 /* Batch E: health timeline dot -- own colour, not gym/water/hubby */
 :root { --teal: #9D7CD8; }
 .timeline-dot.health { background: var(--teal); }
+/* No double-tap zoom: fast taps (passcode, buttons, chips) stay taps. Pinch-to-zoom still works. */
+html, body, button, a, select, input, textarea, label, [onclick], [role="button"], .lock-key, .dish-chip { touch-action: manipulation; }
 </style>
 </head>
 <body>
